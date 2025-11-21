@@ -51,7 +51,7 @@
         <!-- Leaderboard Overlay -->
         <div id="leaderboard-overlay" 
              class="absolute top-4 right-4 bg-white/80 backdrop-blur-sm p-4 rounded-xl shadow-2xl z-20 
-                    w-72 md:w-80 border-t-4 border-blue-500 hidden md:block">
+                    w-72 md:w-80 border-t-4 border-blue-500 block"> <!-- Changed visibility from hidden md:block to block -->
             <h3 class="text-xl font-extrabold text-gray-800 mb-3 flex items-center">
                 <svg class="w-6 h-6 mr-2 text-yellow-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-1-9a1 1 0 00-2 0v5a1 1 0 002 0v-5zm4 0a1 1 0 10-2 0v5a1 1 0 102 0v-5zm-2-5a1 1 0 00-1 1v1a1 1 0 102 0V5a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
                 Top Snow Riders
@@ -62,22 +62,21 @@
             </div>
             <p id="score-status" class="mt-4 text-center text-xs font-medium text-gray-600">
                 Play to submit your high score!
+                <!-- Example: In console, call sendScoreToGame(300) -->
             </p>
         </div>
     </div>
     
-    <!-- Application Logic -->
+    <!-- Application Logic (Moved initialization logic outside of window.onload to fix the module scope issue) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, onSnapshot, query, limit, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, setDoc, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Global Firebase Setup ---
-        // Global variables provided by the Canvas environment
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'snowrider-leaderboard';
         const mockFirebaseConfig = { projectId: 'mock-project-id', apiKey: 'mock-api-key' };
         
-        // Attempt to parse config, fall back to mock if not available
         let firebaseConfig;
         try {
             firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
@@ -92,7 +91,7 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
         let gameInstance = null;
-        let currentUserId = 'Player-' + Math.floor(Math.random() * 100000); // Simple random ID for unauthenticated user
+        let currentUserId = 'Player-' + Math.floor(Math.random() * 1000000).toString().padStart(6, '0'); // More unique random ID
         let currentUserName = currentUserId; // Default name
 
         // Firestore Path Constants
@@ -108,7 +107,7 @@
          * Initializes and starts the Unity WebGL game.
          */
         function startGame() {
-            if (gameInstance) return; // Prevent re-initializing if already loaded
+            if (gameInstance) return;
 
             // UnityLoader is loaded via a separate script tag in the head
             gameInstance = UnityLoader.instantiate("gameContainer", "Build/SnowRider3D-gd-1.json", { 
@@ -116,8 +115,6 @@
                 Module: { 
                     onRuntimeInitialized: function () { 
                         UnityProgress(gameInstance, "complete");
-                        // Optional: Tell the Unity game the user's ID/name if needed
-                        // gameInstance.SendMessage('GameManager', 'SetPlayerInfo', currentUserName);
                     } 
                 } 
             });
@@ -141,7 +138,6 @@
                 item.className = `flex justify-between items-center p-2 rounded-lg 
                                   ${rank === 1 ? 'bg-yellow-100 font-bold text-gray-900' : 'bg-white hover:bg-gray-50'}`;
                 
-                // Add icon for top 3
                 let rankIcon = `<span class="text-gray-500 w-5 text-center">${rank}</span>`;
                 if (rank === 1) rankIcon = `<span class="text-yellow-500 w-5 text-center">🥇</span>`;
                 else if (rank === 2) rankIcon = `<span class="text-gray-400 w-5 text-center">🥈</span>`;
@@ -164,14 +160,8 @@
          * Sets up the real-time listener for the leaderboard.
          */
         function setupLeaderboardListener() {
-            // NOTE: Firestore's `orderBy` requires a corresponding index, 
-            // but we need it here for correct behavior. We will fetch and sort 
-            // in memory for safety against missing indices, but keep the query structure simple.
-            const scoresQuery = query(
-                collection(db, SCORE_COLLECTION_PATH)
-                // orderBy('score', 'desc'), // Removed to prevent index requirement error
-                // limit(5) // Removed to allow client-side sorting/limiting
-            );
+            // Note: We avoid Firestore's orderBy and limit in the query to prevent index requirement errors.
+            const scoresQuery = query(collection(db, SCORE_COLLECTION_PATH));
 
             onSnapshot(scoresQuery, (snapshot) => {
                 const scores = [];
@@ -179,7 +169,7 @@
                     scores.push(doc.data());
                 });
 
-                // 1. Sort the scores in memory (Required because we removed orderBy in query)
+                // 1. Sort the scores in memory
                 scores.sort((a, b) => (b.score || 0) - (a.score || 0));
                 
                 // 2. Limit the scores to the top 5
@@ -202,18 +192,23 @@
             // Use the current user's ID as the document ID for overwriting their previous best score
             const userScoreRef = doc(db, SCORE_COLLECTION_PATH, currentUserId);
             
-            // Check if existing score is higher (optional, but good practice)
-            // For simplicity, we assume this function is only called when a new high score is achieved.
-
             try {
-                await setDoc(userScoreRef, {
-                    userId: currentUserId,
-                    username: currentUserName,
-                    score: score,
-                    timestamp: Date.now() 
-                }, { merge: true }); // Use merge to keep other fields if added later
+                // Fetch the existing score to check if the new score is better
+                const existingDoc = await getDoc(userScoreRef); 
+                const existingScore = existingDoc.exists() ? existingDoc.data().score : 0;
 
-                scoreStatus.textContent = `High score of ${score} submitted!`;
+                if (score > existingScore) {
+                    await setDoc(userScoreRef, {
+                        userId: currentUserId,
+                        username: currentUserName,
+                        score: score,
+                        timestamp: Date.now() 
+                    }, { merge: true });
+
+                    scoreStatus.textContent = `NEW High Score: ${score}!`;
+                } else {
+                    scoreStatus.textContent = `Score of ${score} not higher than your best of ${existingScore}.`;
+                }
             } catch (error) {
                 console.error("Score submission error:", error);
                 scoreStatus.textContent = `Error submitting score. (Score: ${score})`;
@@ -246,7 +241,10 @@
                     await signInAnonymously(auth);
                 }
                 currentUserId = auth.currentUser.uid;
-                currentUserName = `Rider-${currentUserId.substring(0, 4)}`; // Set a simple name based on UID
+                // Update username to reflect signed-in status
+                currentUserName = `Rider-${currentUserId.substring(0, 4)}`;
+                scoreStatus.textContent = `Signed in as ${currentUserName}. Play to submit your score!`;
+                
                 console.log("Firebase Auth: Signed in as:", currentUserName);
             } catch (error) {
                 console.error("Firebase Authentication Error:", error);
@@ -260,8 +258,8 @@
             setupLeaderboardListener();
         }
 
-        // Start the application setup
-        window.onload = initializeApp;
+        // Start the application setup when the DOM is ready
+        document.addEventListener('DOMContentLoaded', initializeApp);
 
     </script>
 </body>
