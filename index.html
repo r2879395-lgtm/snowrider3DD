@@ -4,29 +4,31 @@
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Snow Rider 3D - Register</title>
-    <!-- Load Tailwind CSS -->
+    <title>Snow Rider 3D</title>
+    <!-- We keep Tailwind for styling flexibility, but it's not strictly necessary here -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Configure Font -->
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f0f4f8; /* Light blue background for auth screen */
             margin: 0;
             padding: 0;
+            background-color: #111827; /* Dark background for the game */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            width: 100vw;
             overflow: hidden; /* Prevent scrolling */
         }
-        /* Style to ensure Unity WebGL container is visible and full screen when active */
+        /* Style to ensure Unity WebGL container is visible and full screen */
         #game-content-container {
-            width: 100vw;
-            height: 100vh;
-            position: fixed;
-            top: 0;
-            left: 0;
-            background-color: #111827; /* Dark background for the game */
+            width: 100%;
+            height: 100%;
+            position: relative; /* Relative positioning for flex centering */
         }
         #gameContainer {
+            /* Unity will size the container, but we ensure it fills the parent div */
             width: 100%;
             height: 100%;
         }
@@ -37,99 +39,19 @@
     <script src="Build/UnityLoader.js"></script>
 </head>
 
-<body class="min-h-screen flex items-center justify-center p-4">
+<body>
 
-    <!-- 1. Registration/Login Card (Visible by default) -->
-    <div id="auth-container" class="w-full max-w-md bg-white p-8 rounded-xl shadow-2xl transition-all duration-300 z-10">
-        <h2 id="form-title" class="text-3xl font-bold mb-6 text-center text-gray-800">Create Account to Play</h2>
-        
-        <!-- Input Form -->
-        <form id="authForm" class="space-y-5">
-            <div>
-                <label for="username" class="block text-sm font-medium text-gray-700 mb-1">Username</label>
-                <input type="text" id="username" required placeholder="Choose a unique username"
-                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 shadow-sm">
-            </div>
-            <div>
-                <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                <input type="password" id="password" required placeholder="••••••••"
-                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 shadow-sm">
-            </div>
-
-            <!-- Action Buttons -->
-            <div class="space-y-3">
-                <button type="submit" id="mainBtn"
-                        class="w-full bg-blue-600 text-white font-semibold py-2.5 rounded-lg shadow-md hover:bg-blue-700 transition duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-                    Create Account
-                </button>
-                <button type="button" id="toggleBtn"
-                        class="w-full text-blue-600 bg-gray-100 font-medium py-2 rounded-lg hover:bg-gray-200 transition duration-200">
-                    Already have an account? Log In
-                </button>
-            </div>
-        </form>
-
-        <!-- Messages and Status -->
-        <p id="message" class="mt-6 text-center text-sm font-medium h-5"></p>
-        <p class="mt-4 text-center text-xs text-red-600 font-semibold">
-            WARNING: User authentication should ideally use Firebase's built-in password security.
-        </p>
-
-    </div>
-
-    <!-- 2. Game Content Container (Hidden by default) -->
-    <div id="game-content-container" class="hidden">
+    <!-- Game Content Container (Now visible by default) -->
+    <div id="game-content-container">
         <div class="webgl-content" style="position: absolute; width: 100%; height: 100%;">
             <div id="gameContainer"></div>
         </div>
     </div>
     
-    <!-- Firebase and Application Logic -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // --- Global Firebase Setup ---
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'snowrider-login-gate';
+    <!-- Application Logic to start the game immediately -->
+    <script type="text/javascript">
+        let gameInstance = null;
         
-        // Define a mock configuration if the real one isn't provided, to prevent the initialization crash.
-        const mockFirebaseConfig = { projectId: 'mock-project-id', apiKey: 'mock-api-key' };
-        
-        const firebaseConfig = typeof __firebase_config !== 'undefined' 
-            ? JSON.parse(__firebase_config) 
-            : mockFirebaseConfig; // Use mock config if real config is missing
-
-        
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
-        let authReady = false; // Flag to indicate if authentication has finished its initial check
-        let gameInstance = null; // Will hold the Unity game instance
-
-        // Firestore Path Constants
-        // Note: With the mock config, Firestore access will fail, but the login form will load.
-        const USER_COLLECTION_PATH = `/artifacts/${appId}/public/data/users`;
-
-        // --- DOM Elements ---
-        const authContainer = document.getElementById('auth-container');
-        const gameContentContainer = document.getElementById('game-content-container');
-        const formTitle = document.getElementById('form-title');
-        const mainBtn = document.getElementById('mainBtn');
-        const toggleBtn = document.getElementById('toggleBtn');
-        const messageDisplay = document.getElementById('message');
-        const usernameInput = document.getElementById('username');
-        const passwordInput = document.getElementById('password');
-        
-        // State
-        let isLoginMode = false; // <<< Start in Registration mode
-
-        // Initialize UI based on starting mode
-        window.onload = () => {
-             toggleFormMode(false);
-        };
-        
-
         /**
          * Initializes and starts the Unity WebGL game.
          */
@@ -137,7 +59,6 @@
             if (gameInstance) return; // Prevent re-initializing if already loaded
 
             // UnityLoader is loaded via a separate script tag in the head
-            // The global UnityLoader.instantiate is used here.
             gameInstance = UnityLoader.instantiate("gameContainer", "Build/SnowRider3D-gd-1.json", { 
                 onProgress: UnityProgress, 
                 Module: { 
@@ -148,201 +69,8 @@
             });
         }
 
-        /**
-         * Simulates secure hashing using the Web Crypto API's SHA-256.
-         * WARNING: This is NOT a replacement for server-side bcrypt/Argon2.
-         * @param {string} text The password string to hash.
-         * @returns {Promise<string>} The hexadecimal representation of the hash.
-         */
-        async function hashPassword(text) {
-            const encoder = new TextEncoder();
-            const data = encoder.encode(text);
-            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-            return hashHex;
-        }
-
-        /**
-         * Updates the UI based on authentication status.
-         * @param {boolean} loggedIn 
-         * @param {string} username 
-         */
-        function updateUI(loggedIn, username = '') {
-            if (loggedIn) {
-                // Hide Login, Show Game, Start Game Load
-                authContainer.classList.add('hidden');
-                gameContentContainer.classList.remove('hidden'); 
-                startGame(); 
-            } else {
-                // Show Login, Hide Game
-                authContainer.classList.remove('hidden');
-                gameContentContainer.classList.add('hidden'); 
-                usernameInput.value = '';
-                passwordInput.value = '';
-            }
-            messageDisplay.textContent = '';
-        }
-
-        /**
-         * Toggles the form between Login and Registration mode.
-         * @param {boolean} shouldToggle If true, flips the mode; if false, just applies the current state.
-         */
-        function toggleFormMode(shouldToggle = true) {
-            if (shouldToggle) {
-                isLoginMode = !isLoginMode;
-            }
-
-            if (isLoginMode) {
-                formTitle.textContent = 'Login to Play Snow Rider 3D';
-                mainBtn.textContent = 'Log In';
-                toggleBtn.textContent = 'Need an account? Register';
-                usernameInput.placeholder = 'Enter your username';
-            } else {
-                formTitle.textContent = 'Create Account to Play';
-                mainBtn.textContent = 'Create Account';
-                toggleBtn.textContent = 'Already have an account? Log In';
-                usernameInput.placeholder = 'Choose a unique username';
-            }
-            messageDisplay.textContent = '';
-        }
-
-        // --- Core Application Logic ---
-
-        /**
-         * Attempts to register a new user.
-         */
-        async function handleRegistration(username, password) {
-            messageDisplay.textContent = 'Registering...';
-
-            // 1. Check user exists
-            const q = query(collection(db, USER_COLLECTION_PATH), where("username", "==", username));
-            const querySnapshot = await getDocs(q);
-
-            if (!querySnapshot.empty) {
-                messageDisplay.textContent = 'Registration failed: Username already taken.';
-                return;
-            }
-
-            try {
-                // 2. Hash the password
-                const hashedPassword = await hashPassword(password);
-                
-                // 3. Create a unique document ID
-                const userIdDocId = await hashPassword(username); 
-                const userRef = doc(db, USER_COLLECTION_PATH, userIdDocId);
-
-                // 4. Store user data
-                await setDoc(userRef, {
-                    username: username,
-                    passwordHash: hashedPassword,
-                    createdAt: new Date().toISOString()
-                });
-
-                messageDisplay.textContent = 'Registration successful! Please log in.';
-                isLoginMode = true; // Switch to login mode
-                toggleFormMode(false); // Apply the new login mode state
-            } catch (error) {
-                console.error("Registration Error:", error);
-                messageDisplay.textContent = 'An error occurred during registration. (Firestore access failed)';
-            }
-        }
-
-        /**
-         * Attempts to log in a user.
-         */
-        async function handleLogin(username, password) {
-            messageDisplay.textContent = 'Logging in...';
-
-            try {
-                // 1. Find the user by username
-                const q = query(collection(db, USER_COLLECTION_PATH), where("username", "==", username));
-                const querySnapshot = await getDocs(q);
-
-                if (querySnapshot.empty) {
-                    messageDisplay.textContent = 'Login failed: Invalid username or password.';
-                    return;
-                }
-
-                // 2. Get stored data
-                const userData = querySnapshot.docs[0].data();
-                const storedHash = userData.passwordHash;
-                
-                // 3. Hash the provided password and compare
-                const inputHash = await hashPassword(password);
-                
-                if (inputHash === storedHash) {
-                    messageDisplay.textContent = 'Login successful! Starting game...';
-                    updateUI(true, username);
-                } else {
-                    messageDisplay.textContent = 'Login failed: Invalid username or password.';
-                }
-            } catch (error) {
-                console.error("Login Error:", error);
-                messageDisplay.textContent = 'An error occurred during login. (Firestore access failed)';
-            }
-        }
-
-
-        // --- Event Listeners and Initialization ---
-
-        // 1. Initial Firebase Authentication (required for Firestore access)
-        async function initializeAuth() {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-                authReady = true;
-                console.log("Firebase Auth: Initialization complete.");
-            } catch (error) {
-                // Catch any major error during initial sign-in attempt
-                console.error("Firebase Initialization Error:", error);
-                authReady = true; // Still mark as ready, but unsuccessful
-                // Display a clear error on the form immediately if sign-in failed
-                messageDisplay.textContent = 'Setup error: Cannot connect to game services. Check console.';
-            }
-        }
-
-        // 2. Form Submission Handler
-        document.getElementById('authForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            // Check if auth process has completed its initial run
-            if (!authReady) {
-                messageDisplay.textContent = 'Initializing security... please wait a moment.';
-                await initializeAuth(); 
-            }
-            
-            // Critical check: If we still don't have a signed-in user (auth failed), stop.
-            if (!auth.currentUser) {
-                // If it wasn't successful during initializeAuth, show the message again and block
-                messageDisplay.textContent = 'Authentication failed. Please check setup.';
-                return;
-            }
-
-            const username = usernameInput.value.trim();
-            const password = passwordInput.value;
-
-            if (username === '' || password === '') {
-                messageDisplay.textContent = 'Please enter both username and password.';
-                return;
-            }
-
-            if (isLoginMode) {
-                await handleLogin(username, password);
-            } else {
-                await handleRegistration(username, password);
-            }
-        });
-
-        // 3. Toggle Button Handler
-        toggleBtn.addEventListener('click', () => toggleFormMode(true));
-
-        // Start the application
-        initializeAuth();
-
+        // Start the game once the window is loaded
+        window.onload = startGame;
     </script>
 </body>
 </html>
