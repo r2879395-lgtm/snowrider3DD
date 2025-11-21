@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Snow Rider 3D - Login</title>
+    <title>Snow Rider 3D - Register</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Configure Font -->
@@ -39,15 +39,15 @@
 
 <body class="min-h-screen flex items-center justify-center p-4">
 
-    <!-- 1. Login/Registration Card (Visible by default) -->
+    <!-- 1. Registration/Login Card (Visible by default) -->
     <div id="auth-container" class="w-full max-w-md bg-white p-8 rounded-xl shadow-2xl transition-all duration-300 z-10">
-        <h2 id="form-title" class="text-3xl font-bold mb-6 text-center text-gray-800">Login to Play Snow Rider 3D</h2>
+        <h2 id="form-title" class="text-3xl font-bold mb-6 text-center text-gray-800">Create Account to Play</h2>
         
         <!-- Input Form -->
         <form id="authForm" class="space-y-5">
             <div>
                 <label for="username" class="block text-sm font-medium text-gray-700 mb-1">Username</label>
-                <input type="text" id="username" required placeholder="Enter your username"
+                <input type="text" id="username" required placeholder="Choose a unique username"
                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 shadow-sm">
             </div>
             <div>
@@ -60,11 +60,11 @@
             <div class="space-y-3">
                 <button type="submit" id="mainBtn"
                         class="w-full bg-blue-600 text-white font-semibold py-2.5 rounded-lg shadow-md hover:bg-blue-700 transition duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-                    Log In
+                    Create Account
                 </button>
                 <button type="button" id="toggleBtn"
                         class="w-full text-blue-600 bg-gray-100 font-medium py-2 rounded-lg hover:bg-gray-200 transition duration-200">
-                    Need an account? Register
+                    Already have an account? Log In
                 </button>
             </div>
         </form>
@@ -92,7 +92,14 @@
 
         // --- Global Firebase Setup ---
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'snowrider-login-gate';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        
+        // Define a mock configuration if the real one isn't provided, to prevent the initialization crash.
+        const mockFirebaseConfig = { projectId: 'mock-project-id', apiKey: 'mock-api-key' };
+        
+        const firebaseConfig = typeof __firebase_config !== 'undefined' 
+            ? JSON.parse(__firebase_config) 
+            : mockFirebaseConfig; // Use mock config if real config is missing
+
         
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
@@ -101,6 +108,7 @@
         let gameInstance = null; // Will hold the Unity game instance
 
         // Firestore Path Constants
+        // Note: With the mock config, Firestore access will fail, but the login form will load.
         const USER_COLLECTION_PATH = `/artifacts/${appId}/public/data/users`;
 
         // --- DOM Elements ---
@@ -114,7 +122,13 @@
         const passwordInput = document.getElementById('password');
         
         // State
-        let isLoginMode = true;
+        let isLoginMode = false; // <<< Start in Registration mode
+
+        // Initialize UI based on starting mode
+        window.onload = () => {
+             toggleFormMode(false);
+        };
+        
 
         /**
          * Initializes and starts the Unity WebGL game.
@@ -172,17 +186,23 @@
 
         /**
          * Toggles the form between Login and Registration mode.
+         * @param {boolean} shouldToggle If true, flips the mode; if false, just applies the current state.
          */
-        function toggleFormMode() {
-            isLoginMode = !isLoginMode;
+        function toggleFormMode(shouldToggle = true) {
+            if (shouldToggle) {
+                isLoginMode = !isLoginMode;
+            }
+
             if (isLoginMode) {
                 formTitle.textContent = 'Login to Play Snow Rider 3D';
                 mainBtn.textContent = 'Log In';
                 toggleBtn.textContent = 'Need an account? Register';
+                usernameInput.placeholder = 'Enter your username';
             } else {
                 formTitle.textContent = 'Create Account to Play';
                 mainBtn.textContent = 'Create Account';
                 toggleBtn.textContent = 'Already have an account? Log In';
+                usernameInput.placeholder = 'Choose a unique username';
             }
             messageDisplay.textContent = '';
         }
@@ -220,10 +240,11 @@
                 });
 
                 messageDisplay.textContent = 'Registration successful! Please log in.';
-                toggleFormMode(); // Switch to login mode
+                isLoginMode = true; // Automatically switch to login mode after successful registration
+                toggleFormMode(false); // Apply the new login mode state
             } catch (error) {
                 console.error("Registration Error:", error);
-                messageDisplay.textContent = 'An error occurred during registration.';
+                messageDisplay.textContent = 'An error occurred during registration. (Check console for Firebase details)';
             }
         }
 
@@ -258,7 +279,7 @@
                 }
             } catch (error) {
                 console.error("Login Error:", error);
-                messageDisplay.textContent = 'An error occurred during login.';
+                messageDisplay.textContent = 'An error occurred during login. (Check console for Firebase details)';
             }
         }
 
@@ -280,6 +301,8 @@
                 });
             } catch (error) {
                 console.error("Firebase Initialization Error:", error);
+                // Display error on the screen if auth fails
+                messageDisplay.textContent = 'Setup error: Cannot authenticate Firebase.';
             }
         }
 
@@ -302,7 +325,7 @@
         });
 
         // 3. Toggle Button Handler
-        toggleBtn.addEventListener('click', toggleFormMode);
+        toggleBtn.addEventListener('click', () => toggleFormMode(true));
 
         // Start the application
         initializeAuth();
