@@ -105,6 +105,7 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
         let currentUserId = null;
+        let authReady = false; // Flag to indicate if authentication has finished its initial check
         let gameInstance = null; // Will hold the Unity game instance
 
         // Firestore Path Constants
@@ -215,7 +216,7 @@
         async function handleRegistration(username, password) {
             messageDisplay.textContent = 'Registering...';
 
-            // 1. Check if user already exists
+            // 1. Check user exists
             const q = query(collection(db, USER_COLLECTION_PATH), where("username", "==", username));
             const querySnapshot = await getDocs(q);
 
@@ -228,7 +229,7 @@
                 // 2. Hash the password
                 const hashedPassword = await hashPassword(password);
                 
-                // 3. Create a unique document ID (using the hash of the username)
+                // 3. Create a unique document ID
                 const userIdDocId = await hashPassword(username); 
                 const userRef = doc(db, USER_COLLECTION_PATH, userIdDocId);
 
@@ -240,11 +241,11 @@
                 });
 
                 messageDisplay.textContent = 'Registration successful! Please log in.';
-                isLoginMode = true; // Automatically switch to login mode after successful registration
+                isLoginMode = true; // Switch to login mode
                 toggleFormMode(false); // Apply the new login mode state
             } catch (error) {
                 console.error("Registration Error:", error);
-                messageDisplay.textContent = 'An error occurred during registration. (Check console for Firebase details)';
+                messageDisplay.textContent = 'An error occurred during registration. (Firestore access failed)';
             }
         }
 
@@ -279,7 +280,7 @@
                 }
             } catch (error) {
                 console.error("Login Error:", error);
-                messageDisplay.textContent = 'An error occurred during login. (Check console for Firebase details)';
+                messageDisplay.textContent = 'An error occurred during login. (Firestore access failed)';
             }
         }
 
@@ -288,25 +289,31 @@
 
         // 1. Initial Firebase Authentication (required for Firestore access)
         async function initializeAuth() {
+            // This function ensures the Auth state is settled (signed in or anonymous)
             return new Promise((resolve) => {
                 const unsubscribe = onAuthStateChanged(auth, (user) => {
+                    authReady = true; // Auth state has been checked
                     if (user) {
                         currentUserId = user.uid;
                         console.log("Firebase Auth: Signed in with UID:", user.uid);
                     } else {
-                        // Attempt to sign in with the custom token if available
+                        // If no user is signed in yet, try the required methods
                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            // Use custom token if available (primary method in this environment)
                             signInWithCustomToken(auth, __initial_auth_token).catch(err => {
                                 console.error("Firebase Custom Token Error:", err);
                                 // Fallback to anonymous sign-in if custom token fails
                                 signInAnonymously(auth);
                             });
                         } else {
-                            // No token provided, proceed with anonymous sign-in
-                            signInAnonymously(auth);
+                            // Anonymous sign-in if no token is provided
+                            signInAnonymously(auth).catch(err => {
+                                console.error("Firebase Anonymous Sign-in Error:", err);
+                                // Final state if all sign-in attempts fail
+                            });
                         }
                     }
-                    unsubscribe(); // Stop listening after the first state change
+                    unsubscribe(); // Stop listening after the first definitive state change
                     resolve();
                 });
             });
@@ -315,22 +322,25 @@
         // 2. Form Submission Handler
         document.getElementById('authForm').addEventListener('submit', async (e) => {
             e.preventDefault();
+            
+            if (!authReady) {
+                messageDisplay.textContent = 'Initializing security... please wait a moment.';
+                // Wait for auth to complete if it wasn't ready
+                await initializeAuth(); 
+            }
+            
+            // Critical check: If we still don't have a user ID (auth failed), stop.
+            if (!auth.currentUser) {
+                messageDisplay.textContent = 'Authentication failed. Please check setup.';
+                return;
+            }
+
             const username = usernameInput.value.trim();
             const password = passwordInput.value;
 
             if (username === '' || password === '') {
                 messageDisplay.textContent = 'Please enter both username and password.';
                 return;
-            }
-
-            // Ensure authentication is ready before performing Firestore operations
-            if (!currentUserId) {
-                messageDisplay.textContent = 'Authentication is not ready. Please wait a moment.';
-                await initializeAuth(); // Re-initialize if somehow not ready
-                if (!currentUserId) {
-                    messageDisplay.textContent = 'Authentication failed. Please check setup.';
-                    return;
-                }
             }
 
             if (isLoginMode) {
