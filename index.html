@@ -1,25 +1,268 @@
 <!DOCTYPE html>
-<html lang="en-us">
-
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Snow Rider 3D</title>
-    <link rel="shortcut icon" href="TemplateData/favicon.ico">
-    <link rel="stylesheet" href="TemplateData/style.css">
-    <meta name="description" content="Snow Rider 3D, Snow Rider 3D Mathnook, Snow Rider 3D Unblocked">
-    <meta property="og:image" content="snow-rider-3d.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snow Rider 3D - Leaderboard Edition</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Configure Font -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #111827; /* Dark background for the game */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden; /* Prevent scrolling */
+        }
+        /* Style to ensure Unity WebGL container is visible and full screen */
+        #game-content-container {
+            width: 100%;
+            height: 100%;
+            position: relative; /* Relative positioning for flex centering */
+        }
+        #gameContainer {
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+        }
+    </style>
+
+    <!-- Original Unity Game Scripts -->
     <script src="TemplateData/UnityProgress.js"></script>
     <script src="Build/UnityLoader.js"></script>
-    <script>
-        var gameInstance = UnityLoader.instantiate("gameContainer", "Build/SnowRider3D-gd-1.json", { onProgress: UnityProgress, Module: { onRuntimeInitialized: function () { UnityProgress(gameInstance, "complete") } } });
-    </script>
 </head>
 
-<body style="overflow:hidden; margin:0; padding:0;">
-    <div class="webgl-content" style="position: absolute; width: 100%; height: 100%;">
-        <div id="gameContainer" style="width: 960px; height: 600px; margin: auto"></div>
-    </div>
-</body>
+<body>
 
+    <!-- Game Content Container -->
+    <div id="game-content-container" class="relative">
+        <div class="webgl-content" style="position: absolute; width: 100%; height: 100%;">
+            <div id="gameContainer"></div>
+        </div>
+
+        <!-- Leaderboard Overlay -->
+        <div id="leaderboard-overlay" 
+             class="absolute top-4 right-4 bg-white/80 backdrop-blur-sm p-4 rounded-xl shadow-2xl z-20 
+                    w-72 md:w-80 border-t-4 border-blue-500 hidden md:block">
+            <h3 class="text-xl font-extrabold text-gray-800 mb-3 flex items-center">
+                <svg class="w-6 h-6 mr-2 text-yellow-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-1-9a1 1 0 00-2 0v5a1 1 0 002 0v-5zm4 0a1 1 0 10-2 0v5a1 1 0 102 0v-5zm-2-5a1 1 0 00-1 1v1a1 1 0 102 0V5a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
+                Top Snow Riders
+            </h3>
+            <div id="leaderboard-list" class="space-y-2 text-sm">
+                <!-- Leaderboard items will be injected here -->
+                <p class="text-gray-500 italic">Loading scores...</p>
+            </div>
+            <p id="score-status" class="mt-4 text-center text-xs font-medium text-gray-600">
+                Play to submit your high score!
+            </p>
+        </div>
+    </div>
+    
+    <!-- Application Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, onSnapshot, query, limit, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Global Firebase Setup ---
+        // Global variables provided by the Canvas environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'snowrider-leaderboard';
+        const mockFirebaseConfig = { projectId: 'mock-project-id', apiKey: 'mock-api-key' };
+        
+        // Attempt to parse config, fall back to mock if not available
+        let firebaseConfig;
+        try {
+            firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+            if (!firebaseConfig || !firebaseConfig.projectId) {
+                firebaseConfig = mockFirebaseConfig;
+            }
+        } catch (e) {
+            firebaseConfig = mockFirebaseConfig;
+        }
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        let gameInstance = null;
+        let currentUserId = 'Player-' + Math.floor(Math.random() * 100000); // Simple random ID for unauthenticated user
+        let currentUserName = currentUserId; // Default name
+
+        // Firestore Path Constants
+        const SCORE_COLLECTION_PATH = `/artifacts/${appId}/public/data/scores`;
+        
+        // --- DOM Elements ---
+        const leaderboardList = document.getElementById('leaderboard-list');
+        const scoreStatus = document.getElementById('score-status');
+
+        // --- Helper Functions ---
+
+        /**
+         * Initializes and starts the Unity WebGL game.
+         */
+        function startGame() {
+            if (gameInstance) return; // Prevent re-initializing if already loaded
+
+            // UnityLoader is loaded via a separate script tag in the head
+            gameInstance = UnityLoader.instantiate("gameContainer", "Build/SnowRider3D-gd-1.json", { 
+                onProgress: UnityProgress, 
+                Module: { 
+                    onRuntimeInitialized: function () { 
+                        UnityProgress(gameInstance, "complete");
+                        // Optional: Tell the Unity game the user's ID/name if needed
+                        // gameInstance.SendMessage('GameManager', 'SetPlayerInfo', currentUserName);
+                    } 
+                } 
+            });
+        }
+        
+        /**
+         * Renders the leaderboard data.
+         * @param {Array<Object>} scores List of score objects.
+         */
+        function renderLeaderboard(scores) {
+            leaderboardList.innerHTML = ''; // Clear previous scores
+            
+            if (scores.length === 0) {
+                leaderboardList.innerHTML = '<p class="text-gray-500 italic text-center">No scores submitted yet. Be the first!</p>';
+                return;
+            }
+
+            scores.forEach((scoreData, index) => {
+                const rank = index + 1;
+                const item = document.createElement('div');
+                item.className = `flex justify-between items-center p-2 rounded-lg 
+                                  ${rank === 1 ? 'bg-yellow-100 font-bold text-gray-900' : 'bg-white hover:bg-gray-50'}`;
+                
+                // Add icon for top 3
+                let rankIcon = `<span class="text-gray-500 w-5 text-center">${rank}</span>`;
+                if (rank === 1) rankIcon = `<span class="text-yellow-500 w-5 text-center">🥇</span>`;
+                else if (rank === 2) rankIcon = `<span class="text-gray-400 w-5 text-center">🥈</span>`;
+                else if (rank === 3) rankIcon = `<span class="text-amber-600 w-5 text-center">🥉</span>`;
+
+                item.innerHTML = `
+                    <div class="flex items-center space-x-3">
+                        ${rankIcon}
+                        <span class="truncate max-w-[100px]">${scoreData.username || 'Anonymous'}</span>
+                    </div>
+                    <span class="text-lg font-extrabold text-blue-600">${scoreData.score}</span>
+                `;
+                leaderboardList.appendChild(item);
+            });
+        }
+        
+        // --- Firebase Interaction ---
+
+        /**
+         * Sets up the real-time listener for the leaderboard.
+         */
+        function setupLeaderboardListener() {
+            // NOTE: Firestore's `orderBy` requires a corresponding index, 
+            // but we need it here for correct behavior. We will fetch and sort 
+            // in memory for safety against missing indices, but keep the query structure simple.
+            const scoresQuery = query(
+                collection(db, SCORE_COLLECTION_PATH)
+                // orderBy('score', 'desc'), // Removed to prevent index requirement error
+                // limit(5) // Removed to allow client-side sorting/limiting
+            );
+
+            onSnapshot(scoresQuery, (snapshot) => {
+                const scores = [];
+                snapshot.forEach((doc) => {
+                    scores.push(doc.data());
+                });
+
+                // 1. Sort the scores in memory (Required because we removed orderBy in query)
+                scores.sort((a, b) => (b.score || 0) - (a.score || 0));
+                
+                // 2. Limit the scores to the top 5
+                const topScores = scores.slice(0, 5);
+
+                renderLeaderboard(topScores);
+            }, (error) => {
+                console.error("Leaderboard Snapshot Error:", error);
+                leaderboardList.innerHTML = `<p class="text-red-500 text-center">Error loading leaderboard: check console.</p>`;
+            });
+        }
+        
+        /**
+         * Saves a new score to Firestore.
+         * @param {number} score 
+         */
+        async function saveScore(score) {
+            if (score <= 0) return;
+
+            // Use the current user's ID as the document ID for overwriting their previous best score
+            const userScoreRef = doc(db, SCORE_COLLECTION_PATH, currentUserId);
+            
+            // Check if existing score is higher (optional, but good practice)
+            // For simplicity, we assume this function is only called when a new high score is achieved.
+
+            try {
+                await setDoc(userScoreRef, {
+                    userId: currentUserId,
+                    username: currentUserName,
+                    score: score,
+                    timestamp: Date.now() 
+                }, { merge: true }); // Use merge to keep other fields if added later
+
+                scoreStatus.textContent = `High score of ${score} submitted!`;
+            } catch (error) {
+                console.error("Score submission error:", error);
+                scoreStatus.textContent = `Error submitting score. (Score: ${score})`;
+            }
+        }
+        
+        // --- Exposed Global Function (Simulated Game Callback) ---
+        
+        /**
+         * Global function that the Unity game would theoretically call 
+         * when the player gets a new high score.
+         * @param {string} scoreString The score sent from the game as a string.
+         */
+        window.sendScoreToGame = (scoreString) => {
+            const score = parseInt(scoreString, 10);
+            if (!isNaN(score) && score > 0) {
+                console.log(`Received new score from game: ${score}`);
+                saveScore(score);
+            }
+        };
+
+        // --- Initialization ---
+
+        async function initializeApp() {
+            // 1. Authenticate (Anonymously or with token)
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                currentUserId = auth.currentUser.uid;
+                currentUserName = `Rider-${currentUserId.substring(0, 4)}`; // Set a simple name based on UID
+                console.log("Firebase Auth: Signed in as:", currentUserName);
+            } catch (error) {
+                console.error("Firebase Authentication Error:", error);
+                scoreStatus.textContent = 'Warning: Could not connect to scoreboard services.';
+            }
+
+            // 2. Start the game
+            startGame();
+            
+            // 3. Start the real-time leaderboard listener
+            setupLeaderboardListener();
+        }
+
+        // Start the application setup
+        window.onload = initializeApp;
+
+    </script>
+</body>
 </html>
