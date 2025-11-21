@@ -98,25 +98,33 @@
         import { getFirestore, collection, doc, setDoc, onSnapshot, query, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Global Firebase Setup ---
+        // Setting up Firebase outside the async function so the variables are available globally
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'snowrider-leaderboard';
         const mockFirebaseConfig = { projectId: 'mock-project-id', apiKey: 'mock-api-key' };
         
         let firebaseConfig;
+        let isFirebaseInitialized = false;
+
         try {
             firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-            if (!firebaseConfig || !firebaseConfig.projectId) {
-                firebaseConfig = mockFirebaseConfig;
+            if (firebaseConfig && firebaseConfig.projectId) {
+                const app = initializeApp(firebaseConfig);
+                window.db = getFirestore(app);
+                window.auth = getAuth(app);
+                isFirebaseInitialized = true;
+            } else {
+                console.warn("Firebase config not available. Leaderboard will be disabled.");
+                // Use a mock config only to prevent initializeApp from throwing error if it runs
+                // Note: The logic below prevents the Firebase logic from executing if isFirebaseInitialized is false
             }
         } catch (e) {
-            firebaseConfig = mockFirebaseConfig;
+            console.error("Critical error during Firebase initialization:", e);
+            console.warn("Leaderboard functions will be disabled.");
         }
 
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
         let gameInstance = null;
-        let currentUserId = 'Player-' + Math.floor(Math.random() * 1000000).toString().padStart(6, '0'); // More unique random ID
-        let currentUserName = currentUserId; // Default name
+        let currentUserId = 'Player-' + Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
+        let currentUserName = currentUserId; 
 
         // Firestore Path Constants
         const SCORE_COLLECTION_PATH = `/artifacts/${appId}/public/data/scores`;
@@ -149,6 +157,10 @@
          * @param {Array<Object>} scores List of score objects.
          */
         function renderLeaderboard(scores) {
+            if (!isFirebaseInitialized) {
+                 leaderboardList.innerHTML = '<p class="text-red-500 italic text-center">Leaderboard service unavailable.</p>';
+                 return;
+            }
             leaderboardList.innerHTML = ''; // Clear previous scores
             
             if (scores.length === 0) {
@@ -184,7 +196,9 @@
          * Sets up the real-time listener for the leaderboard.
          */
         function setupLeaderboardListener() {
-            const scoresQuery = query(collection(db, SCORE_COLLECTION_PATH));
+            if (!isFirebaseInitialized) return;
+            
+            const scoresQuery = query(collection(window.db, SCORE_COLLECTION_PATH));
 
             onSnapshot(scoresQuery, (snapshot) => {
                 const scores = [];
@@ -210,10 +224,10 @@
          * @param {number} score 
          */
         async function saveScore(score) {
-            if (score <= 0) return;
+            if (!isFirebaseInitialized || score <= 0) return;
 
             // Use the current user's ID as the document ID for overwriting their previous best score
-            const userScoreRef = doc(db, SCORE_COLLECTION_PATH, currentUserId);
+            const userScoreRef = doc(window.db, SCORE_COLLECTION_PATH, currentUserId);
             
             try {
                 // Fetch the existing score to check if the new score is better
@@ -254,16 +268,22 @@
         };
 
         // --- Initialization ---
-
-        async function initializeApp() {
+        
+        // This function now only handles Firebase logic and is called after the game starts.
+        async function initializeFirebase() {
+            if (!isFirebaseInitialized) {
+                 scoreStatus.textContent = 'Warning: Leaderboard services are currently disabled.';
+                 return;
+            }
+            
             // 1. Authenticate (Anonymously or with token)
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
+                    await signInWithCustomToken(window.auth, __initial_auth_token);
                 } else {
-                    await signInAnonymously(auth);
+                    await signInAnonymously(window.auth);
                 }
-                currentUserId = auth.currentUser.uid;
+                currentUserId = window.auth.currentUser.uid;
                 // Update username to reflect signed-in status
                 currentUserName = `Rider-${currentUserId.substring(0, 4)}`;
                 scoreStatus.textContent = `Signed in as ${currentUserName}. Play to submit your score!`;
@@ -272,17 +292,22 @@
             } catch (error) {
                 console.error("Firebase Authentication Error:", error);
                 scoreStatus.textContent = 'Warning: Could not connect to scoreboard services.';
+                isFirebaseInitialized = false; // Disable if auth fails
+                renderLeaderboard([]);
+                return;
             }
-
-            // 2. Start the game
-            startGame();
             
-            // 3. Start the real-time leaderboard listener
+            // 2. Start the real-time leaderboard listener
             setupLeaderboardListener();
         }
 
-        // Start the application setup when the DOM is ready
-        document.addEventListener('DOMContentLoaded', initializeApp);
+        // Start the game immediately on DOM load
+        document.addEventListener('DOMContentLoaded', () => {
+            // Step 1: Start the game first
+            startGame();
+            // Step 2: Initialize Firebase (asynchronously, non-blocking)
+            initializeFirebase();
+        });
 
     </script>
 </body>
