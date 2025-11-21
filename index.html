@@ -35,9 +35,11 @@
         }
     </style>
 
-    <!-- Original Unity Game Scripts -->
+    <!-- Original Unity Game Scripts (UnityProgress.js and UnityLoader.js are the only things needed here) -->
     <script src="TemplateData/UnityProgress.js"></script>
     <script src="Build/UnityLoader.js"></script>
+    
+    <!-- NOTE: The old inline game initialization script has been removed to prevent conflicts -->
 </head>
 
 <body>
@@ -71,7 +73,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, setDoc, onSnapshot, query, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Global Firebase Setup ---
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'snowrider-leaderboard';
@@ -160,7 +162,6 @@
          * Sets up the real-time listener for the leaderboard.
          */
         function setupLeaderboardListener() {
-            // Note: We avoid Firestore's orderBy and limit in the query to prevent index requirement errors.
             const scoresQuery = query(collection(db, SCORE_COLLECTION_PATH));
 
             onSnapshot(scoresQuery, (snapshot) => {
