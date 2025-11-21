@@ -288,22 +288,28 @@
 
         // 1. Initial Firebase Authentication (required for Firestore access)
         async function initializeAuth() {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-                onAuthStateChanged(auth, (user) => {
+            return new Promise((resolve) => {
+                const unsubscribe = onAuthStateChanged(auth, (user) => {
                     if (user) {
                         currentUserId = user.uid;
+                        console.log("Firebase Auth: Signed in with UID:", user.uid);
+                    } else {
+                        // Attempt to sign in with the custom token if available
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            signInWithCustomToken(auth, __initial_auth_token).catch(err => {
+                                console.error("Firebase Custom Token Error:", err);
+                                // Fallback to anonymous sign-in if custom token fails
+                                signInAnonymously(auth);
+                            });
+                        } else {
+                            // No token provided, proceed with anonymous sign-in
+                            signInAnonymously(auth);
+                        }
                     }
+                    unsubscribe(); // Stop listening after the first state change
+                    resolve();
                 });
-            } catch (error) {
-                console.error("Firebase Initialization Error:", error);
-                // Display error on the screen if auth fails
-                messageDisplay.textContent = 'Setup error: Cannot authenticate Firebase.';
-            }
+            });
         }
 
         // 2. Form Submission Handler
@@ -315,6 +321,16 @@
             if (username === '' || password === '') {
                 messageDisplay.textContent = 'Please enter both username and password.';
                 return;
+            }
+
+            // Ensure authentication is ready before performing Firestore operations
+            if (!currentUserId) {
+                messageDisplay.textContent = 'Authentication is not ready. Please wait a moment.';
+                await initializeAuth(); // Re-initialize if somehow not ready
+                if (!currentUserId) {
+                    messageDisplay.textContent = 'Authentication failed. Please check setup.';
+                    return;
+                }
             }
 
             if (isLoginMode) {
