@@ -72,7 +72,7 @@
         <!-- Messages and Status -->
         <p id="message" class="mt-6 text-center text-sm font-medium h-5"></p>
         <p class="mt-4 text-center text-xs text-red-600 font-semibold">
-            WARNING: This implementation uses client-side hashing for demonstration.
+            WARNING: User authentication should ideally use Firebase's built-in password security.
         </p>
 
     </div>
@@ -104,7 +104,6 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-        let currentUserId = null;
         let authReady = false; // Flag to indicate if authentication has finished its initial check
         let gameInstance = null; // Will hold the Unity game instance
 
@@ -289,48 +288,36 @@
 
         // 1. Initial Firebase Authentication (required for Firestore access)
         async function initializeAuth() {
-            // This function ensures the Auth state is settled (signed in or anonymous)
-            return new Promise((resolve) => {
-                const unsubscribe = onAuthStateChanged(auth, (user) => {
-                    authReady = true; // Auth state has been checked
-                    if (user) {
-                        currentUserId = user.uid;
-                        console.log("Firebase Auth: Signed in with UID:", user.uid);
-                    } else {
-                        // If no user is signed in yet, try the required methods
-                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                            // Use custom token if available (primary method in this environment)
-                            signInWithCustomToken(auth, __initial_auth_token).catch(err => {
-                                console.error("Firebase Custom Token Error:", err);
-                                // Fallback to anonymous sign-in if custom token fails
-                                signInAnonymously(auth);
-                            });
-                        } else {
-                            // Anonymous sign-in if no token is provided
-                            signInAnonymously(auth).catch(err => {
-                                console.error("Firebase Anonymous Sign-in Error:", err);
-                                // Final state if all sign-in attempts fail
-                            });
-                        }
-                    }
-                    unsubscribe(); // Stop listening after the first definitive state change
-                    resolve();
-                });
-            });
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                authReady = true;
+                console.log("Firebase Auth: Initialization complete.");
+            } catch (error) {
+                // Catch any major error during initial sign-in attempt
+                console.error("Firebase Initialization Error:", error);
+                authReady = true; // Still mark as ready, but unsuccessful
+                // Display a clear error on the form immediately if sign-in failed
+                messageDisplay.textContent = 'Setup error: Cannot connect to game services. Check console.';
+            }
         }
 
         // 2. Form Submission Handler
         document.getElementById('authForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
+            // Check if auth process has completed its initial run
             if (!authReady) {
                 messageDisplay.textContent = 'Initializing security... please wait a moment.';
-                // Wait for auth to complete if it wasn't ready
                 await initializeAuth(); 
             }
             
-            // Critical check: If we still don't have a user ID (auth failed), stop.
+            // Critical check: If we still don't have a signed-in user (auth failed), stop.
             if (!auth.currentUser) {
+                // If it wasn't successful during initializeAuth, show the message again and block
                 messageDisplay.textContent = 'Authentication failed. Please check setup.';
                 return;
             }
