@@ -1,76 +1,25 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-us">
+
 <head>
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Snow Rider 3D</title>
-    <!-- We keep Tailwind for styling flexibility, but it's not strictly necessary here -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Configure Font -->
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #111827; /* Dark background for the game */
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            width: 100vw;
-            overflow: hidden; /* Prevent scrolling */
-        }
-        /* Style to ensure Unity WebGL container is visible and full screen */
-        #game-content-container {
-            width: 100%;
-            height: 100%;
-            position: relative; /* Relative positioning for flex centering */
-        }
-        #gameContainer {
-            /* Unity will size the container, but we ensure it fills the parent div */
-            width: 100%;
-            height: 100%;
-        }
-    </style>
-
-    <!-- Original Unity Game Scripts -->
+    <link rel="shortcut icon" href="TemplateData/favicon.ico">
+    <link rel="stylesheet" href="TemplateData/style.css">
+    <meta name="description" content="Snow Rider 3D, Snow Rider 3D Mathnook, Snow Rider 3D Unblocked">
+    <meta property="og:image" content="snow-rider-3d.png" />
     <script src="TemplateData/UnityProgress.js"></script>
     <script src="Build/UnityLoader.js"></script>
+    <script>
+        var gameInstance = UnityLoader.instantiate("gameContainer", "Build/SnowRider3D-gd-1.json", { onProgress: UnityProgress, Module: { onRuntimeInitialized: function () { UnityProgress(gameInstance, "complete") } } });
+    </script>
 </head>
 
-<body>
-
-    <!-- Game Content Container (Now visible by default) -->
-    <div id="game-content-container">
-        <div class="webgl-content" style="position: absolute; width: 100%; height: 100%;">
-            <div id="gameContainer"></div>
-        </div>
+<body style="overflow:hidden; margin:0; padding:0;">
+    <div class="webgl-content" style="position: absolute; width: 100%; height: 100%;">
+        <div id="gameContainer" style="width: 960px; height: 600px; margin: auto"></div>
     </div>
-    
-    <!-- Application Logic to start the game immediately -->
-    <script type="text/javascript">
-        let gameInstance = null;
-        
-        /**
-         * Initializes and starts the Unity WebGL game.
-         */
-        function startGame() {
-            if (gameInstance) return; // Prevent re-initializing if already loaded
-
-            // UnityLoader is loaded via a separate script tag in the head
-            gameInstance = UnityLoader.instantiate("gameContainer", "Build/SnowRider3D-gd-1.json", { 
-                onProgress: UnityProgress, 
-                Module: { 
-                    onRuntimeInitialized: function () { 
-                        UnityProgress(gameInstance, "complete") 
-                    } 
-                } 
-            });
-        }
-
-        // Start the game once the window is loaded
-        window.onload = startGame;
-    </script>
 </body>
+
 </html>
