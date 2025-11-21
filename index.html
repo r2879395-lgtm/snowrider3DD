@@ -1,25 +1,312 @@
 <!DOCTYPE html>
-<html lang="en-us">
-
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Snow Rider 3D</title>
-    <link rel="shortcut icon" href="TemplateData/favicon.ico">
-    <link rel="stylesheet" href="TemplateData/style.css">
-    <meta name="description" content="Snow Rider 3D, Snow Rider 3D Mathnook, Snow Rider 3D Unblocked">
-    <meta property="og:image" content="snow-rider-3d.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snow Rider 3D - Login</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Configure Font -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Light blue background for auth screen */
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Prevent scrolling */
+        }
+        /* Style to ensure Unity WebGL container is visible and full screen when active */
+        #game-content-container {
+            width: 100vw;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            background-color: #111827; /* Dark background for the game */
+        }
+        #gameContainer {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+
+    <!-- Original Unity Game Scripts -->
     <script src="TemplateData/UnityProgress.js"></script>
     <script src="Build/UnityLoader.js"></script>
-    <script>
-        var gameInstance = UnityLoader.instantiate("gameContainer", "Build/SnowRider3D-gd-1.json", { onProgress: UnityProgress, Module: { onRuntimeInitialized: function () { UnityProgress(gameInstance, "complete") } } });
-    </script>
 </head>
 
-<body style="overflow:hidden; margin:0; padding:0;">
-    <div class="webgl-content" style="position: absolute; width: 100%; height: 100%;">
-        <div id="gameContainer" style="width: 960px; height: 600px; margin: auto"></div>
-    </div>
-</body>
+<body class="min-h-screen flex items-center justify-center p-4">
 
+    <!-- 1. Login/Registration Card (Visible by default) -->
+    <div id="auth-container" class="w-full max-w-md bg-white p-8 rounded-xl shadow-2xl transition-all duration-300 z-10">
+        <h2 id="form-title" class="text-3xl font-bold mb-6 text-center text-gray-800">Login to Play Snow Rider 3D</h2>
+        
+        <!-- Input Form -->
+        <form id="authForm" class="space-y-5">
+            <div>
+                <label for="username" class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                <input type="text" id="username" required placeholder="Enter your username"
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 shadow-sm">
+            </div>
+            <div>
+                <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <input type="password" id="password" required placeholder="••••••••"
+                       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 shadow-sm">
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="space-y-3">
+                <button type="submit" id="mainBtn"
+                        class="w-full bg-blue-600 text-white font-semibold py-2.5 rounded-lg shadow-md hover:bg-blue-700 transition duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                    Log In
+                </button>
+                <button type="button" id="toggleBtn"
+                        class="w-full text-blue-600 bg-gray-100 font-medium py-2 rounded-lg hover:bg-gray-200 transition duration-200">
+                    Need an account? Register
+                </button>
+            </div>
+        </form>
+
+        <!-- Messages and Status -->
+        <p id="message" class="mt-6 text-center text-sm font-medium h-5"></p>
+        <p class="mt-4 text-center text-xs text-red-600 font-semibold">
+            WARNING: This implementation uses client-side hashing for demonstration.
+        </p>
+
+    </div>
+
+    <!-- 2. Game Content Container (Hidden by default) -->
+    <div id="game-content-container" class="hidden">
+        <div class="webgl-content" style="position: absolute; width: 100%; height: 100%;">
+            <div id="gameContainer"></div>
+        </div>
+    </div>
+    
+    <!-- Firebase and Application Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, query, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Global Firebase Setup ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'snowrider-login-gate';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        let currentUserId = null;
+        let gameInstance = null; // Will hold the Unity game instance
+
+        // Firestore Path Constants
+        const USER_COLLECTION_PATH = `/artifacts/${appId}/public/data/users`;
+
+        // --- DOM Elements ---
+        const authContainer = document.getElementById('auth-container');
+        const gameContentContainer = document.getElementById('game-content-container');
+        const formTitle = document.getElementById('form-title');
+        const mainBtn = document.getElementById('mainBtn');
+        const toggleBtn = document.getElementById('toggleBtn');
+        const messageDisplay = document.getElementById('message');
+        const usernameInput = document.getElementById('username');
+        const passwordInput = document.getElementById('password');
+        
+        // State
+        let isLoginMode = true;
+
+        /**
+         * Initializes and starts the Unity WebGL game.
+         */
+        function startGame() {
+            if (gameInstance) return; // Prevent re-initializing if already loaded
+
+            // UnityLoader is loaded via a separate script tag in the head
+            // The global UnityLoader.instantiate is used here.
+            gameInstance = UnityLoader.instantiate("gameContainer", "Build/SnowRider3D-gd-1.json", { 
+                onProgress: UnityProgress, 
+                Module: { 
+                    onRuntimeInitialized: function () { 
+                        UnityProgress(gameInstance, "complete") 
+                    } 
+                } 
+            });
+        }
+
+        /**
+         * Simulates secure hashing using the Web Crypto API's SHA-256.
+         * WARNING: This is NOT a replacement for server-side bcrypt/Argon2.
+         * @param {string} text The password string to hash.
+         * @returns {Promise<string>} The hexadecimal representation of the hash.
+         */
+        async function hashPassword(text) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(text);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            return hashHex;
+        }
+
+        /**
+         * Updates the UI based on authentication status.
+         * @param {boolean} loggedIn 
+         * @param {string} username 
+         */
+        function updateUI(loggedIn, username = '') {
+            if (loggedIn) {
+                // Hide Login, Show Game, Start Game Load
+                authContainer.classList.add('hidden');
+                gameContentContainer.classList.remove('hidden'); 
+                startGame(); 
+            } else {
+                // Show Login, Hide Game
+                authContainer.classList.remove('hidden');
+                gameContentContainer.classList.add('hidden'); 
+                usernameInput.value = '';
+                passwordInput.value = '';
+            }
+            messageDisplay.textContent = '';
+        }
+
+        /**
+         * Toggles the form between Login and Registration mode.
+         */
+        function toggleFormMode() {
+            isLoginMode = !isLoginMode;
+            if (isLoginMode) {
+                formTitle.textContent = 'Login to Play Snow Rider 3D';
+                mainBtn.textContent = 'Log In';
+                toggleBtn.textContent = 'Need an account? Register';
+            } else {
+                formTitle.textContent = 'Create Account to Play';
+                mainBtn.textContent = 'Create Account';
+                toggleBtn.textContent = 'Already have an account? Log In';
+            }
+            messageDisplay.textContent = '';
+        }
+
+        // --- Core Application Logic ---
+
+        /**
+         * Attempts to register a new user.
+         */
+        async function handleRegistration(username, password) {
+            messageDisplay.textContent = 'Registering...';
+
+            // 1. Check if user already exists
+            const q = query(collection(db, USER_COLLECTION_PATH), where("username", "==", username));
+            const querySnapshot = await getDocs(q);
+
+            if (!querySnapshot.empty) {
+                messageDisplay.textContent = 'Registration failed: Username already taken.';
+                return;
+            }
+
+            try {
+                // 2. Hash the password
+                const hashedPassword = await hashPassword(password);
+                
+                // 3. Create a unique document ID (using the hash of the username)
+                const userIdDocId = await hashPassword(username); 
+                const userRef = doc(db, USER_COLLECTION_PATH, userIdDocId);
+
+                // 4. Store user data
+                await setDoc(userRef, {
+                    username: username,
+                    passwordHash: hashedPassword,
+                    createdAt: new Date().toISOString()
+                });
+
+                messageDisplay.textContent = 'Registration successful! Please log in.';
+                toggleFormMode(); // Switch to login mode
+            } catch (error) {
+                console.error("Registration Error:", error);
+                messageDisplay.textContent = 'An error occurred during registration.';
+            }
+        }
+
+        /**
+         * Attempts to log in a user.
+         */
+        async function handleLogin(username, password) {
+            messageDisplay.textContent = 'Logging in...';
+
+            try {
+                // 1. Find the user by username
+                const q = query(collection(db, USER_COLLECTION_PATH), where("username", "==", username));
+                const querySnapshot = await getDocs(q);
+
+                if (querySnapshot.empty) {
+                    messageDisplay.textContent = 'Login failed: Invalid username or password.';
+                    return;
+                }
+
+                // 2. Get stored data
+                const userData = querySnapshot.docs[0].data();
+                const storedHash = userData.passwordHash;
+                
+                // 3. Hash the provided password and compare
+                const inputHash = await hashPassword(password);
+                
+                if (inputHash === storedHash) {
+                    messageDisplay.textContent = 'Login successful! Starting game...';
+                    updateUI(true, username);
+                } else {
+                    messageDisplay.textContent = 'Login failed: Invalid username or password.';
+                }
+            } catch (error) {
+                console.error("Login Error:", error);
+                messageDisplay.textContent = 'An error occurred during login.';
+            }
+        }
+
+
+        // --- Event Listeners and Initialization ---
+
+        // 1. Initial Firebase Authentication (required for Firestore access)
+        async function initializeAuth() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        currentUserId = user.uid;
+                    }
+                });
+            } catch (error) {
+                console.error("Firebase Initialization Error:", error);
+            }
+        }
+
+        // 2. Form Submission Handler
+        document.getElementById('authForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = usernameInput.value.trim();
+            const password = passwordInput.value;
+
+            if (username === '' || password === '') {
+                messageDisplay.textContent = 'Please enter both username and password.';
+                return;
+            }
+
+            if (isLoginMode) {
+                await handleLogin(username, password);
+            } else {
+                await handleRegistration(username, password);
+            }
+        });
+
+        // 3. Toggle Button Handler
+        toggleBtn.addEventListener('click', toggleFormMode);
+
+        // Start the application
+        initializeAuth();
+
+    </script>
+</body>
 </html>
