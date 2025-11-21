@@ -98,30 +98,9 @@
         import { getFirestore, collection, doc, setDoc, onSnapshot, query, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Global Firebase Setup ---
-        // Setting up Firebase outside the async function so the variables are available globally
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'snowrider-leaderboard';
-        const mockFirebaseConfig = { projectId: 'mock-project-id', apiKey: 'mock-api-key' };
         
-        let firebaseConfig;
         let isFirebaseInitialized = false;
-
-        try {
-            firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-            if (firebaseConfig && firebaseConfig.projectId) {
-                const app = initializeApp(firebaseConfig);
-                window.db = getFirestore(app);
-                window.auth = getAuth(app);
-                isFirebaseInitialized = true;
-            } else {
-                console.warn("Firebase config not available. Leaderboard will be disabled.");
-                // Use a mock config only to prevent initializeApp from throwing error if it runs
-                // Note: The logic below prevents the Firebase logic from executing if isFirebaseInitialized is false
-            }
-        } catch (e) {
-            console.error("Critical error during Firebase initialization:", e);
-            console.warn("Leaderboard functions will be disabled.");
-        }
-
         let gameInstance = null;
         let currentUserId = 'Player-' + Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
         let currentUserName = currentUserId; 
@@ -132,6 +111,25 @@
         // --- DOM Elements ---
         const leaderboardList = document.getElementById('leaderboard-list');
         const scoreStatus = document.getElementById('score-status');
+
+        try {
+            const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+            
+            if (firebaseConfig && firebaseConfig.projectId) {
+                const app = initializeApp(firebaseConfig);
+                window.db = getFirestore(app);
+                window.auth = getAuth(app);
+                isFirebaseInitialized = true;
+            } else {
+                console.warn("Firebase config not found. Leaderboard will be disabled.");
+                // Ensure the leaderboard message reflects the disabled state immediately
+                leaderboardList.innerHTML = '<p class="text-red-500 italic text-center">Leaderboard service unavailable.</p>';
+            }
+        } catch (e) {
+            console.error("Critical error during Firebase initialization:", e);
+            console.warn("Leaderboard functions will be disabled.");
+            leaderboardList.innerHTML = '<p class="text-red-500 italic text-center">Leaderboard service unavailable.</p>';
+        }
 
         // --- Helper Functions ---
 
@@ -157,10 +155,8 @@
          * @param {Array<Object>} scores List of score objects.
          */
         function renderLeaderboard(scores) {
-            if (!isFirebaseInitialized) {
-                 leaderboardList.innerHTML = '<p class="text-red-500 italic text-center">Leaderboard service unavailable.</p>';
-                 return;
-            }
+            if (!isFirebaseInitialized) return; // Stop if not initialized
+
             leaderboardList.innerHTML = ''; // Clear previous scores
             
             if (scores.length === 0) {
