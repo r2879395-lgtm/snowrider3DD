@@ -4,8 +4,9 @@
 const firebaseConfig = {
   apiKey: "AIzaSyDRDkhXXmqc8wiiozUdtCHUEppaZEiL3As",
   authDomain: "snowrider-34d40.firebaseapp.com",
+    databaseURL: "https://snowrider-34d40-default-rtdb.firebaseio.com",
   projectId: "snowrider-34d40",
-  storageBucket: "snowrider-34d40.firebasestorage.app",
+    storageBucket: "snowrider-34d40.appspot.com",
   messagingSenderId: "359176844016",
   appId: "1:359176844016:web:686e463928b6d71889c835",
   measurementId: "G-Z45Y8Y1449"
