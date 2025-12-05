@@ -42,7 +42,65 @@ window.SubmitScoreToLeaderboard = function(score) {
 
 // Monitor localStorage for Unity game score changes
 let lastScore = 0;
+let lastScoreTime = 0;
 let scoreCheckInterval = null;
+
+function extractScore(value) {
+    if (value === null || value === undefined) return null;
+
+    // If already numeric
+    if (typeof value === 'number') {
+        return Number.isFinite(value) ? value : null;
+    }
+
+    // If simple numeric string
+    if (typeof value === 'string' && value.trim().length) {
+        const direct = parseFloat(value);
+        if (!isNaN(direct) && direct > 0) return direct;
+
+        // Try JSON decode and search numbers inside
+        try {
+            const parsed = JSON.parse(value);
+            const found = findNumberInObject(parsed);
+            if (found) return found;
+        } catch (_) {
+            // Not JSON, fall through
+        }
+
+        // Fallback: regex to pull largest number
+        const matches = value.match(/\d+(?:\.\d+)?/g);
+        if (matches && matches.length) {
+            const nums = matches.map(parseFloat).filter(n => !isNaN(n));
+            if (nums.length) return Math.max(...nums);
+        }
+    }
+
+    return null;
+}
+
+function findNumberInObject(obj) {
+    let best = null;
+    const visit = (v) => {
+        if (v === null || v === undefined) return;
+        if (typeof v === 'number') {
+            if (Number.isFinite(v) && v > 0) {
+                best = best === null ? v : Math.max(best, v);
+            }
+            return;
+        }
+        if (typeof v === 'string') {
+            const num = parseFloat(v);
+            if (!isNaN(num) && num > 0) {
+                best = best === null ? num : Math.max(best, num);
+            }
+            return;
+        }
+        if (Array.isArray(v)) v.forEach(visit);
+        else if (typeof v === 'object') Object.values(v).forEach(visit);
+    };
+    visit(obj);
+    return best;
+}
 
 function startScoreMonitoring() {
     console.log('Starting score monitoring...');
@@ -71,18 +129,16 @@ function startScoreMonitoring() {
             
             // Check each possible key
             for (const key of possibleKeys) {
-                const value = localStorage.getItem(key);
-                if (value !== null) {
-                    const score = parseInt(value);
-                    if (!isNaN(score) && score > 0 && score !== lastScore && score > lastScore) {
+                const raw = localStorage.getItem(key);
+                const score = extractScore(raw);
+                if (score && score > 0) {
+                    const isNew = score !== lastScore || (Date.now() - lastScoreTime) > 5000;
+                    if (isNew && score >= 50) {
                         console.log(`Score detected from ${key}:`, score);
                         lastScore = score;
-                        
-                        // Only submit if it's a reasonable score (not too low)
-                        if (score >= 100) {
-                            if (window.leaderboard) {
-                                window.leaderboard.checkAndAddScore(score);
-                            }
+                        lastScoreTime = Date.now();
+                        if (window.leaderboard) {
+                            window.leaderboard.checkAndAddScore(score);
                         }
                     }
                 }
@@ -125,15 +181,18 @@ localStorage.setItem = function(key, value) {
     
     // Check if this is a score-related key
     if (key && (key.toLowerCase().includes('score') || key.toLowerCase().includes('snowrider'))) {
-        const score = parseInt(value);
-        if (!isNaN(score) && score > 0 && score > lastScore) {
-            console.log(`Score change detected via setItem (${key}):`, score);
-            lastScore = score;
-            
-            if (score >= 100 && window.leaderboard) {
-                setTimeout(() => {
-                    window.leaderboard.checkAndAddScore(score);
-                }, 1000); // Delay to ensure game has finished
+        const score = extractScore(value);
+        if (score && score > 0) {
+            const isNew = score !== lastScore || (Date.now() - lastScoreTime) > 5000;
+            if (isNew) {
+                console.log(`Score change detected via setItem (${key}):`, score);
+                lastScore = score;
+                lastScoreTime = Date.now();
+                if (score >= 50 && window.leaderboard) {
+                    setTimeout(() => {
+                        window.leaderboard.checkAndAddScore(score);
+                    }, 1000); // Delay to ensure game has finished
+                }
             }
         }
     }
