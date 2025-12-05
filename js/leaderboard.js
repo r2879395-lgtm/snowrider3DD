@@ -36,10 +36,7 @@ class Leaderboard {
         // Tab switching
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-                e.target.classList.add('active');
-                this.currentTab = e.target.dataset.tab;
-                this.updateLeaderboardDisplay();
+                this.setTab(e.target.dataset.tab);
             });
         });
 
@@ -232,11 +229,15 @@ class Leaderboard {
                     console.log('✓ Score saved to online leaderboard');
                 } catch (error) {
                     console.error('Failed to save score online:', error);
+                    // Fall back to local tab so the user still sees their score
+                    this.setTab('local');
                 }
             }
 
             // Hide score modal and show leaderboard
             this.hideScoreModal();
+            // Show leaderboard on the most relevant tab
+            this.setTab(this.isOnline ? 'global' : 'local');
             this.showLeaderboard();
             
             this.currentScore = 0;
@@ -244,8 +245,18 @@ class Leaderboard {
     }
 
     showLeaderboard() {
-        this.updateLeaderboardDisplay();
+        // Default to global when online, otherwise local
+        this.setTab(this.isOnline ? 'global' : 'local');
         this.leaderboardModal.style.display = 'block';
+    }
+
+    setTab(tab) {
+        const desired = tab === 'global' && this.isOnline ? 'global' : 'local';
+        this.currentTab = desired;
+        document.querySelectorAll('.tab-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.tab === desired);
+        });
+        this.updateLeaderboardDisplay();
     }
 
     updateLeaderboardDisplay() {
