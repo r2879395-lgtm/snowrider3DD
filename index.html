@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en-us">
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Snow Rider 3D</title>
+    <link rel="shortcut icon" href="TemplateData/favicon.ico">
+    <link rel="stylesheet" href="TemplateData/style.css">
+    <meta name="description" content="Snow Rider 3D, Snow Rider 3D Mathnook, Snow Rider 3D Unblocked">
+    <meta property="og:image" content="snow-rider-3d.png" />
+    <script src="TemplateData/UnityProgress.js"></script>
+    <script src="Build/UnityLoader.js"></script>
+    <script>
+        var gameInstance = UnityLoader.instantiate("gameContainer", "Build/SnowRider3D-gd-1.json", { onProgress: UnityProgress, Module: { onRuntimeInitialized: function () { UnityProgress(gameInstance, "complete") } } });
+    </script>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <link rel="stylesheet" href="TemplateData/style.css">
+</head>
+
+<body style="overflow:hidden; margin:0; padding:0;">
+    <div class="webgl-content" style="position: absolute; width: 100%; height: 100%;">
+        <div id="gameContainer" style="width: 960px; height: 600px; margin: auto"></div>
+    </div>
+
+    <!-- Leaderboard Button -->
+    <button id="leaderboardBtn" class="leaderboard-btn">🏆 Leaderboard</button>
+
+    <!-- Leaderboard Modal -->
+    <div id="leaderboardModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <div class="leaderboard-header">
+                <h2>🏆 Global Leaderboard</h2>
+                <div class="leaderboard-status">
+                    <span id="connectionStatus" class="status-badge">🔄 Connecting...</span>
+                    <span id="playerCount" class="player-count">0 players</span>
+                </div>
+            </div>
+            <div class="leaderboard-tabs">
+                <button class="tab-btn active" data-tab="global">🌍 Global</button>
+                <button class="tab-btn" data-tab="local">💾 Local</button>
+            </div>
+            <div id="leaderboardList" class="leaderboard-list"></div>
+            <button id="clearLeaderboard" class="clear-btn">Clear Local Scores</button>
+        </div>
+    </div>
+
+    <!-- Score Submit Modal -->
+    <div id="scoreModal" class="modal">
+        <div class="modal-content">
+            <h2>🎉 New High Score!</h2>
+            <p>Your score: <span id="currentScore"></span></p>
+            <input type="text" id="playerName" placeholder="Enter your name" maxlength="20">
+            <button id="submitScore" class="submit-btn">Submit Score</button>
+        </div>
+    </div>
+
+    <script src="js/firebase-config.js"></script>
+    <script src="js/leaderboard.js"></script>
+    <script src="js/unity-bridge.js"></script>
+</body>
+
+</html>
