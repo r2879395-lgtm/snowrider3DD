@@ -195,9 +195,23 @@ class Leaderboard {
 
     showScoreModal(score) {
         document.getElementById('currentScore').textContent = score.toLocaleString();
-        this.playerNameInput.value = '';
+        if (this.playerNameInput) {
+            this.playerNameInput.value = '';
+        }
         this.scoreModal.style.display = 'block';
-        this.playerNameInput.focus();
+
+        // Try to reclaim focus from the Unity canvas so typing works
+        try {
+            if (document.activeElement && document.activeElement.blur) {
+                document.activeElement.blur();
+            }
+            if (this.playerNameInput) {
+                // Slight delay helps on some browsers after WebGL focus
+                setTimeout(() => this.playerNameInput.focus(), 50);
+            }
+        } catch (e) {
+            console.log('Focus handling issue:', e);
+        }
     }
 
     hideScoreModal() {
@@ -205,7 +219,14 @@ class Leaderboard {
     }
 
     async submitScore() {
-        const playerName = this.playerNameInput.value.trim() || 'Anonymous';
+        let playerName = 'Anonymous';
+        if (this.playerNameInput) {
+            playerName = this.playerNameInput.value.trim() || 'Anonymous';
+        } else {
+            // Fallback prompt if input is unavailable
+            const promptName = (typeof prompt === 'function') ? prompt('Enter your name for the leaderboard:', '') : '';
+            playerName = (promptName && promptName.trim()) ? promptName.trim() : 'Anonymous';
+        }
         
         if (this.currentScore > 0) {
             const scoreEntry = {
