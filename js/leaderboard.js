@@ -33,6 +33,7 @@ class Leaderboard {
         this.playerNameInput = document.getElementById('playerName');
         this.connectionStatus = document.getElementById('connectionStatus');
         this.playerCount = document.getElementById('playerCount');
+        this.activeBadge = document.getElementById('activePlayers');
 
         // Initialize Firebase/Online database
         this.initializeOnlineDatabase();
@@ -261,6 +262,11 @@ class Leaderboard {
                 this.connectionStatus.textContent = '🟡 Offline';
                 this.connectionStatus.style.color = '#ffaa00';
             }
+        }
+        
+        // Update the prominent badge
+        if (this.activeBadge) {
+            this.activeBadge.textContent = `🎮 ${this.activePlayers} playing`;
         }
     }
 
