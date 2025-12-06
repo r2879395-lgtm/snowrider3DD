@@ -216,9 +216,16 @@ function cropCanvasRegion(canvas, variant = 0) {
 }
 
 async function runCanvasOcr(options = { submit: true }) {
-    if (!SCORE_CONFIG.enableOcr) return;
+    if (!SCORE_CONFIG.enableOcr) {
+        console.log('⚠️ OCR disabled in config');
+        return;
+    }
     const canvas = document.querySelector('#gameContainer canvas');
-    if (!canvas) return;
+    if (!canvas) {
+        console.log('❌ Canvas not found');
+        return null;
+    }
+    console.log(`📊 Canvas size: ${canvas.width}x${canvas.height}`);
 
     try {
         let bestDetected = null;
@@ -227,7 +234,11 @@ async function runCanvasOcr(options = { submit: true }) {
         // Try all 7 crop variants (game-over + homepage)
         for (let variant = 0; variant < 7; variant++) {
             const cropped = cropCanvasRegion(canvas, variant);
-            if (!cropped) continue;
+            if (!cropped) {
+                console.log(`⊘ Variant ${variant}: crop failed`);
+                continue;
+            }
+            console.log(`📷 Variant ${variant}: OCR processing (${cropped.width}x${cropped.height})...`);
 
             const dataUrl = cropped.toDataURL('image/png');
             const result = await window.Tesseract.recognize(dataUrl, 'eng', {
@@ -236,11 +247,20 @@ async function runCanvasOcr(options = { submit: true }) {
 
             const text = (result && result.data && result.data.text) ? result.data.text : '';
             rawText = text.trim();
+            console.log(`   Raw OCR text: "${rawText}"`);
+            
             const matches = text.match(/\d+/g);
-            if (!matches || !matches.length) continue;
+            if (!matches || !matches.length) {
+                console.log(`   No digits found`);
+                continue;
+            }
 
             const numbers = matches.map(n => parseInt(n, 10)).filter(n => isLikelyScore(n));
-            if (!numbers.length) continue;
+            console.log(`   Extracted numbers: ${matches.join(', ')} → Valid scores: ${numbers.join(', ')}`);
+            if (!numbers.length) {
+                console.log(`   No valid scores (outside ${SCORE_CONFIG.minScore}-${SCORE_CONFIG.maxScore})`);
+                continue;
+            }
 
             const bestHere = Math.max(...numbers);
             if (bestDetected === null || bestHere > bestDetected) {
@@ -255,6 +275,7 @@ async function runCanvasOcr(options = { submit: true }) {
             }
             return bestDetected;
         }
+        console.log(`⚠️ No valid score detected across all 7 variants`);
         return null;
     } catch (e) {
         console.log('⚠️ OCR error:', e);
@@ -438,17 +459,24 @@ function startScoreMonitoring() {
 // On-demand scan button
 function wireScanButton() {
     const btn = document.getElementById('scanScoreBtn');
-    if (!btn) return;
+    if (!btn) {
+        console.log('❌ Scan button not found in DOM');
+        return;
+    }
+    console.log('✅ Scan button found, adding click handler');
     btn.addEventListener('click', async () => {
+        console.log('🔘 Scan button clicked');
         btn.disabled = true;
         btn.textContent = 'Scanning...';
         try {
+            console.log('⏳ Loading Tesseract...');
             await loadTesseract();
+            console.log('📷 Running OCR scan...');
             const score = await runCanvasOcr({ submit: true });
             if (score) {
                 console.log(`✅ Scan button detected score: ${score}`);
             } else {
-                console.log('ℹ️ Scan button did not find a score');
+                console.log('ℹ️ Scan button did not find a score - no numbers matched criteria');
             }
         } catch (e) {
             console.log('⚠️ Scan error:', e);
