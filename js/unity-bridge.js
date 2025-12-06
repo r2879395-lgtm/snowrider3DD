@@ -15,7 +15,9 @@ const SCORE_CONFIG = {
     minScoreLength: 3,          // Minimum digits in a score
     debounceTime: 2000,         // Milliseconds to wait before submitting same score again
     domCheckInterval: 500,      // How often to check DOM for score display
-    storageCheckInterval: 1000  // How often to check storage
+    storageCheckInterval: 1000, // How often to check storage
+    enableOcr: true,            // Turn on canvas OCR monitoring
+    ocrInterval: 2500           // How often to OCR the canvas (ms)
 };
 
 // State tracking
@@ -23,6 +25,8 @@ let lastDetectedScore = 0;
 let lastScoreTime = 0;
 let gameStartTime = Date.now();
 let knownTimestamps = new Set();
+let ocrReady = false;
+let ocrIntervalId = null;
 
 // Function that Unity can call directly
 window.SubmitScoreToLeaderboard = function(score) {
@@ -150,6 +154,74 @@ function findNumberInObject(obj) {
     };
     visit(obj);
     return best;
+}
+
+// ---------- Canvas OCR (fallback when game doesn't expose score) ----------
+function loadTesseract() {
+    return new Promise((resolve, reject) => {
+        if (window.Tesseract) {
+            ocrReady = true;
+            resolve();
+            return;
+        }
+
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js';
+        script.onload = () => {
+            ocrReady = true;
+            console.log('📥 Tesseract loaded for OCR score detection');
+            resolve();
+        };
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+}
+
+function cropCanvasRegion(canvas) {
+    const w = canvas.width;
+    const h = canvas.height;
+    if (!w || !h) return null;
+    // The score sits bottom-left in Snow Rider 3D; grab a chunk there.
+    const cropWidth = Math.floor(w * 0.38);
+    const cropHeight = Math.floor(h * 0.32);
+    const sx = 0;
+    const sy = h - cropHeight;
+
+    const off = document.createElement('canvas');
+    off.width = cropWidth;
+    off.height = cropHeight;
+    const ctx = off.getContext('2d');
+    ctx.drawImage(canvas, sx, sy, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+    return off;
+}
+
+async function runCanvasOcr() {
+    if (!SCORE_CONFIG.enableOcr) return;
+    const canvas = document.querySelector('#gameContainer canvas');
+    if (!canvas) return;
+
+    try {
+        const cropped = cropCanvasRegion(canvas);
+        if (!cropped) return;
+
+        const dataUrl = cropped.toDataURL('image/png');
+        const result = await window.Tesseract.recognize(dataUrl, 'eng', {
+            tessedit_char_whitelist: '0123456789',
+        });
+
+        const text = (result && result.data && result.data.text) ? result.data.text : '';
+        const matches = text.match(/\d+/g);
+        if (!matches || !matches.length) return;
+
+        const numbers = matches.map(n => parseInt(n, 10)).filter(n => isLikelyScore(n));
+        if (!numbers.length) return;
+
+        const best = Math.max(...numbers);
+        console.log(`👁️ OCR detected score: ${best} (raw: "${text.trim()}")`);
+        submitScoreToLeaderboard(best);
+    } catch (e) {
+        console.log('⚠️ OCR error:', e);
+    }
 }
 
 // METHOD 1: Monitor DOM for score display
@@ -310,6 +382,17 @@ function startScoreMonitoring() {
     
     // Check IndexedDB periodically
     setInterval(monitorIndexedDB, 5000);
+
+    // Start OCR-based canvas monitoring as last-resort detector
+    if (SCORE_CONFIG.enableOcr) {
+        loadTesseract().then(() => {
+            if (ocrIntervalId) clearInterval(ocrIntervalId);
+            ocrIntervalId = setInterval(runCanvasOcr, SCORE_CONFIG.ocrInterval);
+            console.log('👁️ Canvas OCR monitoring enabled');
+        }).catch(() => {
+            console.log('⚠️ Failed to load Tesseract OCR; canvas monitoring disabled');
+        });
+    }
     
     console.log('✅ All monitoring systems active');
 }
