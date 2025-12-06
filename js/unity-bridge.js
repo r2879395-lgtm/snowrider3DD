@@ -806,8 +806,47 @@ function wireScanButton() {
             return;
         }
         
-        console.log(`✅ Submitting manual score: ${score}`);
-        submitScoreToLeaderboard(score);
+        // Get player name
+        const playerName = prompt('👤 Enter your name for the leaderboard:', 'Player');
+        if (playerName === null) {
+            console.log('ℹ️ Name entry cancelled');
+            return;
+        }
+        
+        console.log(`✅ Submitting manual score: ${score} by ${playerName}`);
+        
+        // Directly submit to leaderboard without going through checkAndAddScore
+        if (window.leaderboard) {
+            const scoreEntry = {
+                name: playerName.trim() || 'Anonymous',
+                score: score,
+                date: new Date().toISOString(),
+                timestamp: Date.now()
+            };
+            
+            // Get local scores and add new one
+            const localScores = window.leaderboard.getScores();
+            localScores.push(scoreEntry);
+            localScores.sort((a, b) => b.score - a.score);
+            const topLocalScores = localScores.slice(0, window.leaderboard.maxEntries);
+            window.leaderboard.saveScores(topLocalScores);
+            
+            // Save to online if available
+            if (window.leaderboard.isOnline && window.leaderboard.leaderboardRef) {
+                window.leaderboard.leaderboardRef.push(scoreEntry).catch(error => {
+                    console.error('Failed to save score online:', error);
+                });
+            }
+            
+            // Show updated leaderboard
+            window.leaderboard.setTab(window.leaderboard.isOnline ? 'global' : 'local');
+            window.leaderboard.showLeaderboard();
+            
+            alert('✅ Score submitted successfully!');
+        } else {
+            console.error('❌ Leaderboard not initialized');
+            alert('❌ Leaderboard not available');
+        }
     });
 }
 
