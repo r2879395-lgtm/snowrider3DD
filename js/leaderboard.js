@@ -107,19 +107,20 @@ class Leaderboard {
                 };
                 
                 this.activePlayersRef.child(this.playerSessionId).set(playerData)
+                    .then(() => console.log('✓ Registered as active player:', this.playerSessionId))
                     .catch(err => console.log('Error registering active player:', err));
                 
                 // Remove this player when they disconnect
                 this.activePlayersRef.child(this.playerSessionId).onDisconnect().remove();
                 
-                // Update active player timestamp every 30 seconds to keep session alive
+                // Update active player timestamp every 15 seconds to keep session alive and show updates
                 this.heartbeatInterval = setInterval(() => {
                     if (this.activePlayersRef) {
                         this.activePlayersRef.child(this.playerSessionId).update({
                             timestamp: firebase.database.ServerValue.TIMESTAMP
                         }).catch(err => console.log('Error updating player timestamp:', err));
                     }
-                }, 30000);
+                }, 15000);
                 
                 // Listen for real-time updates
                 this.leaderboardRef.orderByChild('score').limitToLast(100).on('value', (snapshot) => {
@@ -162,16 +163,24 @@ class Leaderboard {
                 // Listen for active players count
                 this.activePlayersRef.on('value', (snapshot) => {
                     const data = snapshot.val();
+                    console.log('📡 Active players snapshot:', data);
+                    
                     if (!data) {
                         this.activePlayers = 0;
                     } else {
                         const now = Date.now();
-                        const validPlayers = Object.values(data).filter(player => {
+                        const allPlayers = Object.values(data);
+                        console.log(`📊 Total entries in activePlayers: ${allPlayers.length}`);
+                        
+                        const validPlayers = allPlayers.filter(player => {
                             // Consider player active if timestamp is within last 5 minutes
                             const timeSinceLastSeen = now - player.timestamp;
-                            return timeSinceLastSeen < 5 * 60 * 1000;
+                            const isActive = timeSinceLastSeen < 5 * 60 * 1000;
+                            console.log(`   Player: ${player.sessionId}, age: ${(timeSinceLastSeen / 1000).toFixed(1)}s, active: ${isActive}`);
+                            return isActive;
                         });
                         this.activePlayers = validPlayers.length;
+                        console.log(`🎮 Active players: ${this.activePlayers}`);
                     }
                     this.updatePlayerCountDisplay();
                 });
