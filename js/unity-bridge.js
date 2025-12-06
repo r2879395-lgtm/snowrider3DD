@@ -103,6 +103,14 @@ function findNumberInObject(obj) {
 }
 
 function startScoreMonitoring() {
+    console.log('🔍 Score monitoring disabled - use the "📝 Submit Score" button to add scores manually');
+    console.log('💡 This prevents false triggers from localStorage timestamps');
+    
+    // DISABLED: Automatic monitoring was detecting timestamps as scores
+    // Users should click the "Submit Score" button instead
+    return;
+    
+    /* ORIGINAL CODE - DISABLED
     console.log('🔍 Starting score monitoring...');
     console.log('👀 Will check localStorage every 500ms for score changes');
     
@@ -262,6 +270,9 @@ localStorage.setItem = function(key, value) {
     
     console.log(`💾 localStorage.setItem called: ${key} =`, value);
     
+    // DISABLED: Automatic score detection was triggering on timestamps
+    // Use the manual "Submit Score" button instead
+    /*
     // Check if this is a score-related key
     if (key && (key.toLowerCase().includes('score') || key.toLowerCase().includes('snowrider') || key.toLowerCase().includes('unity'))) {
         const score = extractScore(value);
@@ -283,6 +294,7 @@ localStorage.setItem = function(key, value) {
             }
         }
     }
+    */
 };
 
 // Start monitoring when the page loads
