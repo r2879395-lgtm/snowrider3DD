@@ -798,15 +798,43 @@ function wireScanButton() {
         }
         
         const score = parseInt(scoreStr);
-        if (isNaN(score) || score < SCORE_CONFIG.minScore || score > SCORE_CONFIG.maxScore) {
-            alert(`❌ Invalid score. Must be between ${SCORE_CONFIG.minScore} and ${SCORE_CONFIG.maxScore}`);
+        
+        // Validate score
+        if (isNaN(score)) {
+            alert('❌ Invalid score. Must be a number.');
             return;
+        }
+        
+        if (score < SCORE_CONFIG.minScore || score > SCORE_CONFIG.maxScore) {
+            alert(`❌ Invalid score. Must be between ${SCORE_CONFIG.minScore.toLocaleString()} and ${SCORE_CONFIG.maxScore.toLocaleString()}`);
+            return;
+        }
+        
+        // Check if it looks like a timestamp (13 digits, ~current time)
+        const scoreStr13 = String(score);
+        if (scoreStr13.length === 13) {
+            const now = Date.now();
+            const oneYear = 365 * 24 * 60 * 60 * 1000;
+            if (Math.abs(score - now) < oneYear) {
+                alert('⚠️ That looks like a timestamp, not a game score. Please enter your actual score.');
+                return;
+            }
         }
         
         // Get player name
         const playerName = prompt('👤 Enter your name for the leaderboard:', 'Player');
         if (playerName === null) {
             console.log('ℹ️ Name entry cancelled');
+            return;
+        }
+        
+        if (!playerName.trim()) {
+            alert('❌ Please enter a valid name (1-50 characters)');
+            return;
+        }
+        
+        if (playerName.length > 50) {
+            alert('❌ Name too long. Maximum 50 characters.');
             return;
         }
         
