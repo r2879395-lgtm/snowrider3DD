@@ -310,12 +310,52 @@ function cropCanvasRegion(canvas, variant = 0) {
     const ctx = off.getContext('2d');
     ctx.drawImage(canvas, Math.floor(r.sx), Math.floor(r.sy), Math.floor(r.sw), Math.floor(r.sh), 0, 0, off.width, off.height);
 
-    // Boost contrast to help OCR
+    // Enhanced contrast for OCR: preserve light text better
     const img = ctx.getImageData(0, 0, off.width, off.height);
-    for (let i = 0; i < img.data.length; i += 4) {
-        const gray = 0.299 * img.data[i] + 0.587 * img.data[i + 1] + 0.114 * img.data[i + 2];
-        const v = gray > 100 ? 255 : 0; // Even lower threshold
-        img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+    const data = img.data;
+    
+    // First pass: calculate histogram to find better threshold
+    const histogram = new Array(256).fill(0);
+    for (let i = 0; i < data.length; i += 4) {
+        const gray = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+        histogram[gray]++;
+    }
+    
+    // Find threshold using Otsu's method (adaptive threshold)
+    let sum = 0;
+    let sumB = 0;
+    let wB = 0;
+    let max = 0;
+    let threshold = 0;
+    
+    for (let i = 0; i < 256; i++) {
+        wB += histogram[i];
+        if (wB === 0) continue;
+        
+        const wF = (data.length / 4) - wB;
+        if (wF === 0) break;
+        
+        sumB += i * histogram[i];
+        const mB = sumB / wB;
+        const mF = (sum - sumB) / wF;
+        
+        const between = wB * wF * Math.pow(mB - mF, 2);
+        
+        if (between > max) {
+            max = between;
+            threshold = i;
+        }
+        
+        sum += i * histogram[i];
+    }
+    
+    console.log(`   Otsu threshold: ${threshold}`);
+    
+    // Second pass: apply adaptive threshold with slight dilation
+    for (let i = 0; i < data.length; i += 4) {
+        const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        const bw = gray > threshold ? 255 : 0;
+        data[i] = data[i + 1] = data[i + 2] = bw;
     }
     ctx.putImageData(img, 0, 0);
 
@@ -338,8 +378,10 @@ async function runCanvasOcr(options = { submit: true }) {
         let bestDetected = null;
         let rawText = '';
         
-        // Try all 7 crop variants (full regions)
-        for (let variant = 0; variant < 7; variant++) {
+        // Prioritize V3 (top-left where score text is), then others
+        const priority = [3, 1, 5, 0, 6, 2, 4];
+        
+        for (let variant of priority) {
             const cropped = cropCanvasRegion(canvas, variant);
             if (!cropped) {
                 console.log(`⊘ Variant ${variant}: crop failed`);
