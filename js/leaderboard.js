@@ -35,7 +35,17 @@ class Leaderboard {
         this.playerCount = document.getElementById('playerCount');
         this.activeBadge = document.getElementById('activePlayers');
         this.playersListContent = document.getElementById('playersListContent');
-        this.currentPlayerName = localStorage.getItem('snowRider3D_playerName') || 'Anonymous';
+        this.welcomeModal = document.getElementById('welcomeModal');
+        this.welcomePlayerNameInput = document.getElementById('welcomePlayerName');
+        this.welcomeStartBtn = document.getElementById('welcomeStartBtn');
+        this.currentPlayerName = localStorage.getItem('snowRider3D_playerName') || null;
+
+        // Show welcome modal if no saved name
+        if (!this.currentPlayerName) {
+            this.showWelcomeModal();
+        } else {
+            console.log('👤 Welcome back,', this.currentPlayerName);
+        }
 
         // Initialize Firebase/Online database
         this.initializeOnlineDatabase();
@@ -66,6 +76,7 @@ class Leaderboard {
             if (e.target === this.scoreModal) {
                 this.hideScoreModal();
             }
+            // Don't allow closing welcome modal by clicking outside
         });
 
         // Enter key to submit score
@@ -74,6 +85,22 @@ class Leaderboard {
                 this.submitScore();
             }
         });
+
+        // Enter key in welcome modal
+        if (this.welcomePlayerNameInput) {
+            this.welcomePlayerNameInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.handleWelcomeSubmit();
+                }
+            });
+        }
+
+        // Welcome start button
+        if (this.welcomeStartBtn) {
+            this.welcomeStartBtn.addEventListener('click', () => {
+                this.handleWelcomeSubmit();
+            });
+        }
 
         // Track when user closes browser/tab - remove from active players
         window.addEventListener('beforeunload', () => {
@@ -106,11 +133,11 @@ class Leaderboard {
                 const playerData = {
                     timestamp: firebase.database.ServerValue.TIMESTAMP,
                     sessionId: this.playerSessionId,
-                    name: this.currentPlayerName
+                    name: this.currentPlayerName || 'Anonymous'
                 };
                 
                 this.activePlayersRef.child(this.playerSessionId).set(playerData)
-                    .then(() => console.log('✓ Registered as active player:', this.playerSessionId, this.currentPlayerName))
+                    .then(() => console.log('✓ Registered as active player:', this.playerSessionId, this.currentPlayerName || 'Anonymous'))
                     .catch(err => console.log('Error registering active player:', err));
                 
                 // Remove this player when they disconnect
@@ -561,6 +588,38 @@ class Leaderboard {
 
     hideLeaderboard() {
         this.leaderboardModal.style.display = 'none';
+    }
+
+    showWelcomeModal() {
+        if (this.welcomeModal) {
+            this.welcomeModal.style.display = 'block';
+            if (this.welcomePlayerNameInput) {
+                setTimeout(() => this.welcomePlayerNameInput.focus(), 100);
+            }
+        }
+    }
+
+    handleWelcomeSubmit() {
+        const name = this.welcomePlayerNameInput.value.trim();
+        if (!name) {
+            alert('Please enter your name!');
+            return;
+        }
+
+        // Save player name
+        localStorage.setItem('snowRider3D_playerName', name);
+        this.currentPlayerName = name;
+        console.log('👤 Welcome,', name);
+
+        // Update active player name in Firebase
+        if (this.activePlayersRef) {
+            this.activePlayersRef.child(this.playerSessionId).update({
+                name: name
+            }).catch(err => console.log('Error updating player name:', err));
+        }
+
+        // Hide welcome modal
+        this.welcomeModal.style.display = 'none';
     }
 
     escapeHtml(text) {

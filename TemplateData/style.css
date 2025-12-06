@@ -261,6 +261,22 @@ body {
     }
 }
 
+.welcome-modal {
+    background: linear-gradient(135deg, #00ff88 0%, #00cc66 100%) !important;
+    color: #000 !important;
+    text-align: center;
+    max-width: 400px;
+}
+
+.welcome-modal h2 {
+    color: #000;
+    margin-bottom: 10px;
+}
+
+.welcome-modal p {
+    color: #222;
+}
+
 .close {
     color: #aaa;
     float: right;
