@@ -509,7 +509,7 @@ body {
 .active-players-badge {
     position: fixed;
     top: 20px;
-    right: 20px;
+    left: 20px;
     background: linear-gradient(135deg, #00ff88 0%, #00cc66 100%);
     color: #000;
     padding: 12px 18px;
