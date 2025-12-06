@@ -855,12 +855,21 @@ function wireScanButton() {
             localScores.sort((a, b) => b.score - a.score);
             const topLocalScores = localScores.slice(0, window.leaderboard.maxEntries);
             window.leaderboard.saveScores(topLocalScores);
+            console.log('✅ Score saved locally');
             
             // Save to online if available
             if (window.leaderboard.isOnline && window.leaderboard.leaderboardRef) {
-                window.leaderboard.leaderboardRef.push(scoreEntry).catch(error => {
-                    console.error('Failed to save score online:', error);
-                });
+                console.log('📤 Attempting to save score to Firebase...');
+                window.leaderboard.leaderboardRef.push(scoreEntry)
+                    .then(() => {
+                        console.log('✅ Score saved to Firebase successfully!');
+                    })
+                    .catch(error => {
+                        console.error('❌ Firebase write failed:', error.code, error.message);
+                        console.log('📋 Score data:', scoreEntry);
+                    });
+            } else {
+                console.log('⚠️ Firebase not available, score saved locally only');
             }
             
             // Show updated leaderboard
@@ -904,14 +913,53 @@ if (document.readyState === 'loading') {
     wireScanButton();
 }
 
+
+// Debug: Test Firebase write permissions
+window.debugTestFirebaseWrite = async function() {
+    console.log('🔍 Testing Firebase write permissions...');
+    
+    if (!window.leaderboard || !window.leaderboard.leaderboardRef) {
+        console.error('❌ Firebase not initialized');
+        return;
+    }
+    
+    const testEntry = {
+        name: 'TEST_' + Date.now(),
+        score: 12345,
+        date: new Date().toISOString(),
+        timestamp: Date.now()
+    };
+    
+    console.log('📝 Writing test entry:', testEntry);
+    
+    try {
+        const ref = await window.leaderboard.leaderboardRef.push(testEntry);
+        console.log('✅ Write successful! Key:', ref.key);
+        console.log('📖 Check Firebase Console to verify data');
+    } catch (error) {
+        console.error('❌ Write failed!');
+        console.error('   Error code:', error.code);
+        console.error('   Error message:', error.message);
+        console.error('   Error:', error);
+        
+        if (error.code === 'PERMISSION_DENIED') {
+            console.log('💡 Solution: Update Firebase Rules to allow writes');
+            console.log('   See FIREBASE_RULES.md for security rules to apply');
+        }
+    }
+};
+
 // Log when the bridge is ready
 console.log('════════════════════════════════════════════════════════════');
 console.log('🏆 Unity-Leaderboard Bridge Initialized');
 console.log('════════════════════════════════════════════════════════════');
 console.log('📋 Testing commands:');
 console.log('   testLeaderboard()      - Add sample scores');
-console.log('   Press "📝 Submit Score" button - Manual score entry');
+console.log('   debugFirebase()        - Check Firebase connection');
+console.log('   debugTestFirebaseWrite() - Test write permissions');
+console.log('   Press "➕ Submit Score" button - Manual score entry');
 console.log('════════════════════════════════════════════════════════════');
 console.log('🔍 Auto-detection: Active with smart timestamp filtering');
 console.log('💡 Watch this console - you\'ll see logs when scores are detected!');
 console.log('════════════════════════════════════════════════════════════');
+
