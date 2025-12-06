@@ -19,12 +19,10 @@ class Leaderboard {
     init() {
         // Get DOM elements
         this.leaderboardBtn = document.getElementById('leaderboardBtn');
-        this.manualScoreBtn = document.getElementById('manualScoreBtn');
         this.leaderboardModal = document.getElementById('leaderboardModal');
         this.scoreModal = document.getElementById('scoreModal');
         this.closeBtn = document.querySelector('.close');
         this.submitScoreBtn = document.getElementById('submitScore');
-        this.clearLeaderboardBtn = document.getElementById('clearLeaderboard');
         this.playerNameInput = document.getElementById('playerName');
         this.connectionStatus = document.getElementById('connectionStatus');
         this.playerCount = document.getElementById('playerCount');
@@ -34,10 +32,8 @@ class Leaderboard {
 
         // Bind events
         this.leaderboardBtn.addEventListener('click', () => this.showLeaderboard());
-        this.manualScoreBtn.addEventListener('click', () => this.promptManualScore());
         this.closeBtn.addEventListener('click', () => this.hideLeaderboard());
         this.submitScoreBtn.addEventListener('click', () => this.submitScore());
-        this.clearLeaderboardBtn.addEventListener('click', () => this.clearLeaderboard());
         
         // Tab switching
         document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -416,15 +412,6 @@ class Leaderboard {
         this.leaderboardModal.style.display = 'none';
     }
 
-    clearLeaderboard() {
-        if (confirm('Are you sure you want to clear all local leaderboard scores?')) {
-            localStorage.removeItem(this.storageKey);
-            if (this.currentTab === 'local') {
-                this.updateLeaderboardDisplay();
-            }
-        }
-    }
-
     escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
@@ -438,17 +425,6 @@ class Leaderboard {
         this.submitScore();
     }
 
-    promptManualScore() {
-        const score = prompt('Enter your score:');
-        if (score && !isNaN(parseInt(score))) {
-            const scoreNum = parseInt(score);
-            if (scoreNum > 0) {
-                this.checkAndAddScore(scoreNum);
-            } else {
-                alert('Please enter a valid score greater than 0');
-            }
-        }
-    }
 }
 
 // Initialize leaderboard when DOM is ready
