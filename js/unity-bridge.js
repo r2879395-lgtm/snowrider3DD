@@ -182,10 +182,12 @@ function cropCanvasRegion(canvas, variant = 0) {
     const h = canvas.height;
     if (!w || !h) return null;
 
-    // Two variants: 0 = bottom-left score region, 1 = slightly higher/larger box
+    // Multiple crops targeting score text: "69 SCORE", "104 BEST", "+7 GIFTS"
     const regions = [
-        { sx: 0, sy: h * 0.68, sw: w * 0.42, sh: h * 0.30 },
-        { sx: 0, sy: h * 0.60, sw: w * 0.50, sh: h * 0.36 }
+        { sx: 0.02 * w, sy: 0.72 * h, sw: 0.35 * w, sh: 0.25 * h },      // Tight bottom-left (69 SCORE)
+        { sx: 0, sy: 0.68 * h, sw: 0.40 * w, sh: 0.30 * h },             // Slightly wider
+        { sx: 0, sy: 0.65 * h, sw: 0.45 * w, sh: 0.33 * h },             // Even wider
+        { sx: 0.15 * w, sy: 0.65 * h, sw: 0.40 * w, sh: 0.28 * h }       // Center-shifted (104 BEST)
     ];
     const r = regions[Math.min(variant, regions.length - 1)];
 
@@ -193,13 +195,13 @@ function cropCanvasRegion(canvas, variant = 0) {
     off.width = Math.floor(r.sw);
     off.height = Math.floor(r.sh);
     const ctx = off.getContext('2d');
-    ctx.drawImage(canvas, r.sx, r.sy, r.sw, r.sh, 0, 0, off.width, off.height);
+    ctx.drawImage(canvas, Math.floor(r.sx), Math.floor(r.sy), Math.floor(r.sw), Math.floor(r.sh), 0, 0, off.width, off.height);
 
     // Boost contrast to help OCR
     const img = ctx.getImageData(0, 0, off.width, off.height);
     for (let i = 0; i < img.data.length; i += 4) {
         const gray = 0.299 * img.data[i] + 0.587 * img.data[i + 1] + 0.114 * img.data[i + 2];
-        const v = gray > 140 ? 255 : 0; // simple threshold
+        const v = gray > 120 ? 255 : 0; // Lowered threshold to catch lighter text
         img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
     }
     ctx.putImageData(img, 0, 0);
@@ -215,7 +217,9 @@ async function runCanvasOcr(options = { submit: true }) {
     try {
         let bestDetected = null;
         let rawText = '';
-        for (let variant = 0; variant < 2; variant++) {
+        
+        // Try all crop variants
+        for (let variant = 0; variant < 4; variant++) {
             const cropped = cropCanvasRegion(canvas, variant);
             if (!cropped) continue;
 
