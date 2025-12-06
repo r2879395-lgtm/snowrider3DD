@@ -195,7 +195,34 @@ class Leaderboard {
         const qualifiesOnline = this.isOnline && (this.onlineScores.length < this.maxEntries || score > this.onlineScores[this.onlineScores.length - 1].score);
         
         if (qualifiesLocal || qualifiesOnline) {
-            this.showScoreModal(score);
+            // Use browser prompt instead of modal to bypass Unity keyboard capture
+            const playerName = prompt(`🎉 New High Score: ${score.toLocaleString()}!\n\nEnter your name for the leaderboard:`, 'Player');
+            
+            if (playerName !== null) { // User didn't click cancel
+                const scoreEntry = {
+                    name: playerName.trim() || 'Anonymous',
+                    score: score,
+                    date: new Date().toISOString(),
+                    timestamp: Date.now()
+                };
+
+                // Save to local storage
+                localScores.push(scoreEntry);
+                localScores.sort((a, b) => b.score - a.score);
+                const topLocalScores = localScores.slice(0, this.maxEntries);
+                this.saveScores(topLocalScores);
+
+                // Save to online database if available
+                if (this.isOnline && this.leaderboardRef) {
+                    this.leaderboardRef.push(scoreEntry).catch(error => {
+                        console.error('Failed to save score online:', error);
+                    });
+                }
+
+                // Show leaderboard
+                this.setTab(this.isOnline ? 'global' : 'local');
+                this.leaderboardModal.style.display = 'block';
+            }
         }
     }
 
