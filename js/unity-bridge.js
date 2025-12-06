@@ -177,21 +177,33 @@ function loadTesseract() {
     });
 }
 
-function cropCanvasRegion(canvas) {
+function cropCanvasRegion(canvas, variant = 0) {
     const w = canvas.width;
     const h = canvas.height;
     if (!w || !h) return null;
-    // The score sits bottom-left in Snow Rider 3D; grab a chunk there.
-    const cropWidth = Math.floor(w * 0.38);
-    const cropHeight = Math.floor(h * 0.32);
-    const sx = 0;
-    const sy = h - cropHeight;
+
+    // Two variants: 0 = bottom-left score region, 1 = slightly higher/larger box
+    const regions = [
+        { sx: 0, sy: h * 0.68, sw: w * 0.42, sh: h * 0.30 },
+        { sx: 0, sy: h * 0.60, sw: w * 0.50, sh: h * 0.36 }
+    ];
+    const r = regions[Math.min(variant, regions.length - 1)];
 
     const off = document.createElement('canvas');
-    off.width = cropWidth;
-    off.height = cropHeight;
+    off.width = Math.floor(r.sw);
+    off.height = Math.floor(r.sh);
     const ctx = off.getContext('2d');
-    ctx.drawImage(canvas, sx, sy, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+    ctx.drawImage(canvas, r.sx, r.sy, r.sw, r.sh, 0, 0, off.width, off.height);
+
+    // Boost contrast to help OCR
+    const img = ctx.getImageData(0, 0, off.width, off.height);
+    for (let i = 0; i < img.data.length; i += 4) {
+        const gray = 0.299 * img.data[i] + 0.587 * img.data[i + 1] + 0.114 * img.data[i + 2];
+        const v = gray > 140 ? 255 : 0; // simple threshold
+        img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+    }
+    ctx.putImageData(img, 0, 0);
+
     return off;
 }
 
@@ -201,27 +213,39 @@ async function runCanvasOcr(options = { submit: true }) {
     if (!canvas) return;
 
     try {
-        const cropped = cropCanvasRegion(canvas);
-        if (!cropped) return;
+        let bestDetected = null;
+        let rawText = '';
+        for (let variant = 0; variant < 2; variant++) {
+            const cropped = cropCanvasRegion(canvas, variant);
+            if (!cropped) continue;
 
-        const dataUrl = cropped.toDataURL('image/png');
-        const result = await window.Tesseract.recognize(dataUrl, 'eng', {
-            tessedit_char_whitelist: '0123456789',
-        });
+            const dataUrl = cropped.toDataURL('image/png');
+            const result = await window.Tesseract.recognize(dataUrl, 'eng', {
+                tessedit_char_whitelist: '0123456789',
+            });
 
-        const text = (result && result.data && result.data.text) ? result.data.text : '';
-        const matches = text.match(/\d+/g);
-        if (!matches || !matches.length) return null;
+            const text = (result && result.data && result.data.text) ? result.data.text : '';
+            rawText = text.trim();
+            const matches = text.match(/\d+/g);
+            if (!matches || !matches.length) continue;
 
-        const numbers = matches.map(n => parseInt(n, 10)).filter(n => isLikelyScore(n));
-        if (!numbers.length) return null;
+            const numbers = matches.map(n => parseInt(n, 10)).filter(n => isLikelyScore(n));
+            if (!numbers.length) continue;
 
-        const best = Math.max(...numbers);
-        console.log(`👁️ OCR detected score: ${best} (raw: "${text.trim()}")`);
-        if (options.submit !== false) {
-            submitScoreToLeaderboard(best);
+            const bestHere = Math.max(...numbers);
+            if (bestDetected === null || bestHere > bestDetected) {
+                bestDetected = bestHere;
+            }
         }
-        return best;
+
+        if (bestDetected !== null) {
+            console.log(`👁️ OCR detected score: ${bestDetected} (raw: "${rawText}")`);
+            if (options.submit !== false) {
+                submitScoreToLeaderboard(bestDetected);
+            }
+            return bestDetected;
+        }
+        return null;
     } catch (e) {
         console.log('⚠️ OCR error:', e);
         return null;
