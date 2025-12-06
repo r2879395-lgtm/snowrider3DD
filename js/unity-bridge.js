@@ -182,12 +182,18 @@ function cropCanvasRegion(canvas, variant = 0) {
     const h = canvas.height;
     if (!w || !h) return null;
 
-    // Multiple crops targeting score text: "69 SCORE", "104 BEST", "+7 GIFTS"
+    // Multiple crops: game-over screen + homepage/menu stats
     const regions = [
+        // Game-over screen (bottom-left area)
         { sx: 0.02 * w, sy: 0.72 * h, sw: 0.35 * w, sh: 0.25 * h },      // Tight bottom-left (69 SCORE)
         { sx: 0, sy: 0.68 * h, sw: 0.40 * w, sh: 0.30 * h },             // Slightly wider
         { sx: 0, sy: 0.65 * h, sw: 0.45 * w, sh: 0.33 * h },             // Even wider
-        { sx: 0.15 * w, sy: 0.65 * h, sw: 0.40 * w, sh: 0.28 * h }       // Center-shifted (104 BEST)
+        { sx: 0.15 * w, sy: 0.65 * h, sw: 0.40 * w, sh: 0.28 * h },      // Center-shifted
+        
+        // Homepage/menu stats (left-side wooden sign area showing "104 BEST", "5 PLAYS")
+        { sx: 0.02 * w, sy: 0.15 * h, sw: 0.35 * w, sh: 0.45 * h },      // Left sign full area
+        { sx: 0.05 * w, sy: 0.18 * h, sw: 0.25 * w, sh: 0.35 * h },      // Focused on stats
+        { sx: 0, sy: 0.12 * h, sw: 0.40 * w, sh: 0.50 * h },             // Wider left region
     ];
     const r = regions[Math.min(variant, regions.length - 1)];
 
@@ -218,8 +224,8 @@ async function runCanvasOcr(options = { submit: true }) {
         let bestDetected = null;
         let rawText = '';
         
-        // Try all crop variants
-        for (let variant = 0; variant < 4; variant++) {
+        // Try all 7 crop variants (game-over + homepage)
+        for (let variant = 0; variant < 7; variant++) {
             const cropped = cropCanvasRegion(canvas, variant);
             if (!cropped) continue;
 
