@@ -177,23 +177,130 @@ function loadTesseract() {
     });
 }
 
+// Debug: Create downloadable crops for manual analysis
+window.debugExportCrops = function() {
+    const canvas = document.querySelector('#gameContainer canvas');
+    if (!canvas) {
+        console.log('❌ Canvas not found');
+        return;
+    }
+    
+    const w = canvas.width;
+    const h = canvas.height;
+    const regions = [
+        { name: 'V0: Bottom half', sx: 0, sy: h * 0.5, sw: w, sh: h * 0.5 },
+        { name: 'V1: Left half', sx: 0, sy: 0, sw: w * 0.5, sh: h },
+        { name: 'V2: Bottom-left', sx: 0, sy: h * 0.5, sw: w * 0.5, sh: h * 0.5 },
+        { name: 'V3: Top-left', sx: 0, sy: 0, sw: w * 0.5, sh: h * 0.5 },
+        { name: 'V4: Center strip', sx: w * 0.25, sy: h * 0.3, sw: w * 0.5, sh: h * 0.4 },
+        { name: 'V5: Full canvas', sx: 0, sy: 0, sw: w, sh: h },
+        { name: 'V6: Lower strip', sx: 0, sy: h * 0.4, sw: w, sh: h * 0.6 }
+    ];
+    
+    console.log(`📋 OCR Crop Regions (Canvas ${w}x${h}):`);
+    regions.forEach((r, i) => {
+        console.log(`  ${r.name}: (${r.sx.toFixed(0)}, ${r.sy.toFixed(0)}) size ${r.sw.toFixed(0)}x${r.sh.toFixed(0)}`);
+    });
+    
+    // Create and download each crop as a PNG file
+    regions.forEach((r, i) => {
+        setTimeout(() => {
+            const cropped = cropCanvasRegion(canvas, i);
+            if (cropped) {
+                const link = document.createElement('a');
+                link.href = cropped.toDataURL('image/png');
+                link.download = `crop_v${i}_${r.name.replace(/[^a-z0-9]/gi, '_')}.png`;
+                link.click();
+                console.log(`💾 Downloaded: ${link.download}`);
+            }
+        }, i * 500); // Stagger downloads to avoid browser blocking
+    });
+};
+
+// Debug: Also show crop regions visually on the canvas
+window.debugShowCropRegions = function() {
+    const canvas = document.querySelector('#gameContainer canvas');
+    if (!canvas) {
+        console.log('❌ Canvas not found');
+        return;
+    }
+    
+    const w = canvas.width;
+    const h = canvas.height;
+    const regions = [
+        { name: 'V0: Bottom half', sx: 0, sy: h * 0.5, sw: w, sh: h * 0.5 },
+        { name: 'V1: Left half', sx: 0, sy: 0, sw: w * 0.5, sh: h },
+        { name: 'V2: Bottom-left', sx: 0, sy: h * 0.5, sw: w * 0.5, sh: h * 0.5 },
+        { name: 'V3: Top-left', sx: 0, sy: 0, sw: w * 0.5, sh: h * 0.5 },
+        { name: 'V4: Center strip', sx: w * 0.25, sy: h * 0.3, sw: w * 0.5, sh: h * 0.4 },
+        { name: 'V5: Full canvas', sx: 0, sy: 0, sw: w, sh: h },
+        { name: 'V6: Lower strip', sx: 0, sy: h * 0.4, sw: w, sh: h * 0.6 }
+    ];
+    
+    // Create an overlay canvas showing all regions
+    const overlay = document.createElement('canvas');
+    overlay.width = w;
+    overlay.height = h;
+    overlay.style.position = 'absolute';
+    overlay.style.border = '2px solid red';
+    overlay.style.pointerEvents = 'none';
+    overlay.style.zIndex = '10000';
+    
+    const ctx = overlay.getContext('2d');
+    const colors = ['red', 'lime', 'blue', 'yellow', 'magenta', 'cyan', 'orange'];
+    
+    regions.forEach((r, i) => {
+        ctx.strokeStyle = colors[i % colors.length];
+        ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.7;
+        ctx.strokeRect(r.sx, r.sy, r.sw, r.sh);
+        
+        ctx.fillStyle = colors[i % colors.length];
+        ctx.globalAlpha = 1;
+        ctx.font = 'bold 12px Arial';
+        ctx.fillText(`V${i}`, r.sx + 5, r.sy + 15);
+    });
+    
+    // Position overlay on top of game canvas
+    const gameContainer = document.getElementById('gameContainer');
+    overlay.style.top = gameContainer.offsetTop + 'px';
+    overlay.style.left = gameContainer.offsetLeft + 'px';
+    document.body.appendChild(overlay);
+    
+    console.log('🎨 Crop regions visualization added to page (red/lime/blue/yellow/magenta/cyan/orange boxes)');
+    setTimeout(() => {
+        overlay.remove();
+        console.log('🗑️ Visualization removed after 10 seconds');
+    }, 10000);
+};
+
 function cropCanvasRegion(canvas, variant = 0) {
     const w = canvas.width;
     const h = canvas.height;
     if (!w || !h) return null;
 
-    // Multiple crops: game-over screen + homepage/menu stats
+    // Aggressive crops covering entire canvas regions and specific score areas
     const regions = [
-        // Game-over screen (bottom-left area)
-        { sx: 0.02 * w, sy: 0.72 * h, sw: 0.35 * w, sh: 0.25 * h },      // Tight bottom-left (69 SCORE)
-        { sx: 0, sy: 0.68 * h, sw: 0.40 * w, sh: 0.30 * h },             // Slightly wider
-        { sx: 0, sy: 0.65 * h, sw: 0.45 * w, sh: 0.33 * h },             // Even wider
-        { sx: 0.15 * w, sy: 0.65 * h, sw: 0.40 * w, sh: 0.28 * h },      // Center-shifted
+        // Full bottom half (score should be here when game ends)
+        { sx: 0, sy: h * 0.5, sw: w, sh: h * 0.5 },
         
-        // Homepage/menu stats (left-side wooden sign area showing "104 BEST", "5 PLAYS")
-        { sx: 0.02 * w, sy: 0.15 * h, sw: 0.35 * w, sh: 0.45 * h },      // Left sign full area
-        { sx: 0.05 * w, sy: 0.18 * h, sw: 0.25 * w, sh: 0.35 * h },      // Focused on stats
-        { sx: 0, sy: 0.12 * h, sw: 0.40 * w, sh: 0.50 * h },             // Wider left region
+        // Full left half (homepage stats on left side)
+        { sx: 0, sy: 0, sw: w * 0.5, sh: h },
+        
+        // Bottom-left quadrant
+        { sx: 0, sy: h * 0.5, sw: w * 0.5, sh: h * 0.5 },
+        
+        // Top-left quadrant (homepage stats area)
+        { sx: 0, sy: 0, sw: w * 0.5, sh: h * 0.5 },
+        
+        // Center vertical strip (for middle scores)
+        { sx: w * 0.25, sy: h * 0.3, sw: w * 0.5, sh: h * 0.4 },
+        
+        // Full canvas (last resort - full screenshot)
+        { sx: 0, sy: 0, sw: w, sh: h },
+        
+        // Lower portion of full width
+        { sx: 0, sy: h * 0.4, sw: w, sh: h * 0.6 }
     ];
     const r = regions[Math.min(variant, regions.length - 1)];
 
@@ -207,7 +314,7 @@ function cropCanvasRegion(canvas, variant = 0) {
     const img = ctx.getImageData(0, 0, off.width, off.height);
     for (let i = 0; i < img.data.length; i += 4) {
         const gray = 0.299 * img.data[i] + 0.587 * img.data[i + 1] + 0.114 * img.data[i + 2];
-        const v = gray > 120 ? 255 : 0; // Lowered threshold to catch lighter text
+        const v = gray > 100 ? 255 : 0; // Even lower threshold
         img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
     }
     ctx.putImageData(img, 0, 0);
@@ -231,7 +338,7 @@ async function runCanvasOcr(options = { submit: true }) {
         let bestDetected = null;
         let rawText = '';
         
-        // Try all 7 crop variants (game-over + homepage)
+        // Try all 7 crop variants (full regions)
         for (let variant = 0; variant < 7; variant++) {
             const cropped = cropCanvasRegion(canvas, variant);
             if (!cropped) {
@@ -247,18 +354,20 @@ async function runCanvasOcr(options = { submit: true }) {
 
             const text = (result && result.data && result.data.text) ? result.data.text : '';
             rawText = text.trim();
-            console.log(`   Raw OCR text: "${rawText}"`);
+            if (rawText) {
+                console.log(`   ✓ Raw OCR text: "${rawText}"`);
+            } else {
+                console.log(`   (empty OCR result)`);
+            }
             
             const matches = text.match(/\d+/g);
             if (!matches || !matches.length) {
-                console.log(`   No digits found`);
                 continue;
             }
 
             const numbers = matches.map(n => parseInt(n, 10)).filter(n => isLikelyScore(n));
             console.log(`   Extracted numbers: ${matches.join(', ')} → Valid scores: ${numbers.join(', ')}`);
             if (!numbers.length) {
-                console.log(`   No valid scores (outside ${SCORE_CONFIG.minScore}-${SCORE_CONFIG.maxScore})`);
                 continue;
             }
 
