@@ -383,62 +383,159 @@ function cropCanvasRegion(canvas, variant = 0) {
     ];
     const r = regions[Math.min(variant, regions.length - 1)];
 
-    const off = document.createElement('canvas');
-    off.width = Math.floor(r.sw);
-    off.height = Math.floor(r.sh);
-    const ctx = off.getContext('2d');
-    ctx.drawImage(canvas, Math.floor(r.sx), Math.floor(r.sy), Math.floor(r.sw), Math.floor(r.sh), 0, 0, off.width, off.height);
+    try {
+        // Convert canvas to image first (workaround for WebGL canvas)
+        const img = new Image();
+        img.onload = function() {
+            // After image loads, crop it
+            const off = document.createElement('canvas');
+            off.width = Math.floor(r.sw);
+            off.height = Math.floor(r.sh);
+            const ctx = off.getContext('2d');
+            
+            if (!ctx) {
+                console.log(`   ⚠️ Cannot get 2D context from crop canvas`);
+                return null;
+            }
 
-    // Enhanced contrast for OCR: preserve light text better
-    const img = ctx.getImageData(0, 0, off.width, off.height);
-    const data = img.data;
-    
-    // First pass: calculate histogram to find better threshold
-    const histogram = new Array(256).fill(0);
-    for (let i = 0; i < data.length; i += 4) {
-        const gray = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
-        histogram[gray]++;
-    }
-    
-    // Find threshold using Otsu's method (adaptive threshold)
-    let sum = 0;
-    let sumB = 0;
-    let wB = 0;
-    let max = 0;
-    let threshold = 0;
-    
-    for (let i = 0; i < 256; i++) {
-        wB += histogram[i];
-        if (wB === 0) continue;
+            // Draw the cropped region
+            ctx.drawImage(img, Math.floor(r.sx), Math.floor(r.sy), Math.floor(r.sw), Math.floor(r.sh), 0, 0, off.width, off.height);
+
+            // Enhanced contrast for OCR: preserve light text better
+            const imgData = ctx.getImageData(0, 0, off.width, off.height);
+            const data = imgData.data;
+            
+            // First pass: calculate histogram to find better threshold
+            const histogram = new Array(256).fill(0);
+            for (let i = 0; i < data.length; i += 4) {
+                const gray = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+                histogram[gray]++;
+            }
+            
+            // Find threshold using Otsu's method (adaptive threshold)
+            let sum = 0;
+            let sumB = 0;
+            let wB = 0;
+            let max = 0;
+            let threshold = 0;
+            
+            for (let i = 0; i < 256; i++) {
+                wB += histogram[i];
+                if (wB === 0) continue;
+                
+                const wF = (data.length / 4) - wB;
+                if (wF === 0) break;
+                
+                sumB += i * histogram[i];
+                const mB = sumB / wB;
+                const mF = (sum - sumB) / wF;
+                
+                const between = wB * wF * Math.pow(mB - mF, 2);
+                
+                if (between > max) {
+                    max = between;
+                    threshold = i;
+                }
+                
+                sum += i * histogram[i];
+            }
+            
+            console.log(`   Otsu threshold: ${threshold}`);
+            
+            // Second pass: apply adaptive threshold with slight dilation
+            for (let i = 0; i < data.length; i += 4) {
+                const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+                const bw = gray > threshold ? 255 : 0;
+                data[i] = data[i + 1] = data[i + 2] = bw;
+            }
+            ctx.putImageData(imgData, 0, 0);
+
+            return off;
+        };
         
-        const wF = (data.length / 4) - wB;
-        if (wF === 0) break;
+        // Start the async image load
+        img.src = canvas.toDataURL('image/png');
         
-        sumB += i * histogram[i];
-        const mB = sumB / wB;
-        const mF = (sum - sumB) / wF;
+        // For synchronous return, we need a different approach
+        // Create a temporary canvas and draw immediately
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = Math.floor(r.sw);
+        tempCanvas.height = Math.floor(r.sh);
+        const tempCtx = tempCanvas.getContext('2d');
         
-        const between = wB * wF * Math.pow(mB - mF, 2);
+        if (!tempCtx) {
+            console.log(`   ⚠️ Cannot get 2D context`);
+            return null;
+        }
+
+        // This approach: convert to image data URL, then draw
+        const imageData = tempCtx.getImageData(0, 0, 1, 1); // Dummy call to initialize
         
-        if (between > max) {
-            max = between;
-            threshold = i;
+        // Better approach: use the canvas directly with drawImage (if possible)
+        try {
+            tempCtx.drawImage(canvas, Math.floor(r.sx), Math.floor(r.sy), Math.floor(r.sw), Math.floor(r.sh), 0, 0, tempCanvas.width, tempCanvas.height);
+        } catch (e1) {
+            console.log(`   drawImage failed, trying toDataURL approach: ${e1.message}`);
+            
+            // Fallback: Draw from toDataURL (slower but works with WebGL)
+            const tmpImg = new Image();
+            tmpImg.src = canvas.toDataURL('image/png');
+            tempCtx.drawImage(tmpImg, Math.floor(r.sx), Math.floor(r.sy), Math.floor(r.sw), Math.floor(r.sh), 0, 0, tempCanvas.width, tempCanvas.height);
+        }
+
+        // Enhanced contrast for OCR: preserve light text better
+        const imgData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+        const data = imgData.data;
+        
+        // First pass: calculate histogram to find better threshold
+        const histogram = new Array(256).fill(0);
+        for (let i = 0; i < data.length; i += 4) {
+            const gray = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+            histogram[gray]++;
         }
         
-        sum += i * histogram[i];
-    }
-    
-    console.log(`   Otsu threshold: ${threshold}`);
-    
-    // Second pass: apply adaptive threshold with slight dilation
-    for (let i = 0; i < data.length; i += 4) {
-        const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-        const bw = gray > threshold ? 255 : 0;
-        data[i] = data[i + 1] = data[i + 2] = bw;
-    }
-    ctx.putImageData(img, 0, 0);
+        // Find threshold using Otsu's method (adaptive threshold)
+        let sum = 0;
+        let sumB = 0;
+        let wB = 0;
+        let max = 0;
+        let threshold = 0;
+        
+        for (let i = 0; i < 256; i++) {
+            wB += histogram[i];
+            if (wB === 0) continue;
+            
+            const wF = (data.length / 4) - wB;
+            if (wF === 0) break;
+            
+            sumB += i * histogram[i];
+            const mB = sumB / wB;
+            const mF = (sum - sumB) / wF;
+            
+            const between = wB * wF * Math.pow(mB - mF, 2);
+            
+            if (between > max) {
+                max = between;
+                threshold = i;
+            }
+            
+            sum += i * histogram[i];
+        }
+        
+        // Second pass: apply adaptive threshold
+        for (let i = 0; i < data.length; i += 4) {
+            const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+            const bw = gray > threshold ? 255 : 0;
+            data[i] = data[i + 1] = data[i + 2] = bw;
+        }
+        tempCtx.putImageData(imgData, 0, 0);
 
-    return off;
+        return tempCanvas;
+        
+    } catch (e) {
+        console.log(`   Crop error: ${e.message}`);
+        return null;
+    }
 }
 
 async function runCanvasOcr(options = { submit: true }) {
