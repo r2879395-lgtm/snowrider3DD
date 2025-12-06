@@ -54,13 +54,10 @@ function submitScoreToLeaderboard(score) {
     lastDetectedScore = numScore;
     lastScoreTime = Date.now();
     
-    if (window.leaderboard) {
-        window.leaderboard.checkAndAddScore(numScore);
-        return true;
-    } else {
-        console.error('❌ Leaderboard not initialized');
-        return false;
-    }
+    // Disabled: Automatic score submission
+    // Users must manually use the "➕ Submit Score" button
+    console.log('ℹ️ Automatic submission disabled - use Submit Score button to add to leaderboard');
+    return false;
 }
 
 // Validate if a number could be a score vs a timestamp
