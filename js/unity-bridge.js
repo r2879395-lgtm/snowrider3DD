@@ -195,7 +195,7 @@ function cropCanvasRegion(canvas) {
     return off;
 }
 
-async function runCanvasOcr() {
+async function runCanvasOcr(options = { submit: true }) {
     if (!SCORE_CONFIG.enableOcr) return;
     const canvas = document.querySelector('#gameContainer canvas');
     if (!canvas) return;
@@ -211,16 +211,20 @@ async function runCanvasOcr() {
 
         const text = (result && result.data && result.data.text) ? result.data.text : '';
         const matches = text.match(/\d+/g);
-        if (!matches || !matches.length) return;
+        if (!matches || !matches.length) return null;
 
         const numbers = matches.map(n => parseInt(n, 10)).filter(n => isLikelyScore(n));
-        if (!numbers.length) return;
+        if (!numbers.length) return null;
 
         const best = Math.max(...numbers);
         console.log(`👁️ OCR detected score: ${best} (raw: "${text.trim()}")`);
-        submitScoreToLeaderboard(best);
+        if (options.submit !== false) {
+            submitScoreToLeaderboard(best);
+        }
+        return best;
     } catch (e) {
         console.log('⚠️ OCR error:', e);
+        return null;
     }
 }
 
@@ -397,6 +401,30 @@ function startScoreMonitoring() {
     console.log('✅ All monitoring systems active');
 }
 
+// On-demand scan button
+function wireScanButton() {
+    const btn = document.getElementById('scanScoreBtn');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        btn.textContent = 'Scanning...';
+        try {
+            await loadTesseract();
+            const score = await runCanvasOcr({ submit: true });
+            if (score) {
+                console.log(`✅ Scan button detected score: ${score}`);
+            } else {
+                console.log('ℹ️ Scan button did not find a score');
+            }
+        } catch (e) {
+            console.log('⚠️ Scan error:', e);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '🔍 Scan Score';
+        }
+    });
+}
+
 // Helper function to manually test the leaderboard
 window.testLeaderboard = function() {
     const testScores = [
@@ -417,9 +445,13 @@ window.testLeaderboard = function() {
 
 // Start monitoring when the page loads
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', startScoreMonitoring);
+    document.addEventListener('DOMContentLoaded', () => {
+        startScoreMonitoring();
+        wireScanButton();
+    });
 } else {
     startScoreMonitoring();
+    wireScanButton();
 }
 
 // Log when the bridge is ready
