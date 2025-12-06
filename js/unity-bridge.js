@@ -1,76 +1,126 @@
 /**
- * Unity-to-Leaderboard Bridge
+ * Unity-to-Leaderboard Bridge - Enhanced Score Detection
  * 
- * This script provides integration between Unity WebGL game and the leaderboard system.
- * 
- * USAGE IN UNITY:
- * ----------------
- * Add this C# code to your Unity game to send scores to the leaderboard:
- * 
- * using UnityEngine;
- * using System.Runtime.InteropServices;
- * 
- * public class ScoreManager : MonoBehaviour
- * {
- *     [DllImport("__Internal")]
- *     private static extern void SubmitScoreToLeaderboard(int score);
- * 
- *     public void SendScore(int score)
- *     {
- *         #if UNITY_WEBGL && !UNITY_EDITOR
- *         SubmitScoreToLeaderboard(score);
- *         #endif
- *     }
- * }
- * 
- * Then call it when the game ends:
- * scoreManager.SendScore(playerScore);
- * 
- * ALTERNATIVE METHOD:
- * -------------------
- * If you cannot modify Unity code, you can use this JavaScript to periodically
- * check for score updates from Unity PlayerPrefs or other methods.
+ * This script provides multiple methods to detect game scores:
+ * 1. Direct Unity callback (window.SubmitScoreToLeaderboard)
+ * 2. DOM monitoring for score display elements
+ * 3. IndexedDB monitoring for UnityCache
+ * 4. Smart localStorage filtering (ignores timestamps)
  */
+
+// Configuration
+const SCORE_CONFIG = {
+    minScore: 100,              // Minimum valid score
+    maxScore: 999999999,        // Maximum valid score
+    minScoreLength: 3,          // Minimum digits in a score
+    debounceTime: 2000,         // Milliseconds to wait before submitting same score again
+    domCheckInterval: 500,      // How often to check DOM for score display
+    storageCheckInterval: 1000  // How often to check storage
+};
+
+// State tracking
+let lastDetectedScore = 0;
+let lastScoreTime = 0;
+let gameStartTime = Date.now();
+let knownTimestamps = new Set();
 
 // Function that Unity can call directly
 window.SubmitScoreToLeaderboard = function(score) {
-    console.log('Score received from Unity:', score);
-    if (window.leaderboard) {
-        window.leaderboard.checkAndAddScore(score);
-    }
+    console.log('✅ Score received from Unity via callback:', score);
+    submitScoreToLeaderboard(score);
 };
 
-// Monitor localStorage for Unity game score changes
-let lastScore = 0;
-let lastScoreTime = 0;
-let scoreCheckInterval = null;
+// Core score submission function
+function submitScoreToLeaderboard(score) {
+    const numScore = parseInt(score);
+    
+    if (isNaN(numScore) || numScore < SCORE_CONFIG.minScore || numScore > SCORE_CONFIG.maxScore) {
+        console.log(`⚠️ Invalid score detected: ${score}`);
+        return false;
+    }
+    
+    // Check if this is a duplicate recent submission
+    const timeSinceLastScore = Date.now() - lastScoreTime;
+    if (numScore === lastDetectedScore && timeSinceLastScore < SCORE_CONFIG.debounceTime) {
+        console.log(`⏭️ Skipping duplicate score: ${numScore} (submitted ${timeSinceLastScore}ms ago)`);
+        return false;
+    }
+    
+    console.log(`🎯 Valid score detected: ${numScore}`);
+    lastDetectedScore = numScore;
+    lastScoreTime = Date.now();
+    
+    if (window.leaderboard) {
+        window.leaderboard.checkAndAddScore(numScore);
+        return true;
+    } else {
+        console.error('❌ Leaderboard not initialized');
+        return false;
+    }
+}
+
+// Validate if a number could be a score vs a timestamp
+function isLikelyScore(value) {
+    const num = typeof value === 'string' ? parseInt(value) : value;
+    
+    if (isNaN(num) || !Number.isFinite(num)) return false;
+    
+    // Timestamps are 13 digits (milliseconds since epoch)
+    const valueStr = String(Math.abs(num));
+    if (valueStr.length === 13) {
+        // Check if it's close to current time (within last year or next year)
+        const oneYear = 365 * 24 * 60 * 60 * 1000;
+        const now = Date.now();
+        if (Math.abs(num - now) < oneYear) {
+            knownTimestamps.add(num);
+            return false;
+        }
+    }
+    
+    // Timestamps created after page load are definitely not scores
+    if (num > gameStartTime && num < Date.now() + 1000) {
+        knownTimestamps.add(num);
+        return false;
+    }
+    
+    // Check against known timestamps
+    if (knownTimestamps.has(num)) return false;
+    
+    // Score must be within configured bounds
+    if (num < SCORE_CONFIG.minScore || num > SCORE_CONFIG.maxScore) return false;
+    
+    // Score must have reasonable number of digits
+    if (valueStr.length < SCORE_CONFIG.minScoreLength) return false;
+    
+    return true;
+}
 
 function extractScore(value) {
     if (value === null || value === undefined) return null;
 
     // If already numeric
     if (typeof value === 'number') {
-        return Number.isFinite(value) ? value : null;
+        return isLikelyScore(value) ? value : null;
     }
 
     // If simple numeric string
     if (typeof value === 'string' && value.trim().length) {
-        const direct = parseFloat(value);
-        if (!isNaN(direct) && direct > 0) return direct;
+        const direct = parseInt(value);
+        if (!isNaN(direct) && isLikelyScore(direct)) return direct;
 
         // Try JSON decode and search numbers inside
         try {
             const parsed = JSON.parse(value);
             const found = findNumberInObject(parsed);
-            if (found) return found;
+            if (found && isLikelyScore(found)) return found;
         } catch (_) {
             // Not JSON, fall through
         }
 
-        // Fallback: regex to pull largest number
-        const matches = value.match(/\d+(?:\.\d+)?/g);
+        // Fallback: regex to pull numbers
+        const matches = value.match(/\d+/g);
         if (matches && matches.length) {
-            const nums = matches.map(parseFloat).filter(n => !isNaN(n));
+            const nums = matches.map(n => parseInt(n)).filter(n => isLikelyScore(n));
             if (nums.length) return Math.max(...nums);
         }
     }
@@ -83,14 +133,14 @@ function findNumberInObject(obj) {
     const visit = (v) => {
         if (v === null || v === undefined) return;
         if (typeof v === 'number') {
-            if (Number.isFinite(v) && v > 0) {
+            if (isLikelyScore(v)) {
                 best = best === null ? v : Math.max(best, v);
             }
             return;
         }
         if (typeof v === 'string') {
-            const num = parseFloat(v);
-            if (!isNaN(num) && num > 0) {
+            const num = parseInt(v);
+            if (!isNaN(num) && isLikelyScore(num)) {
                 best = best === null ? num : Math.max(best, num);
             }
             return;
@@ -102,223 +152,166 @@ function findNumberInObject(obj) {
     return best;
 }
 
-function startScoreMonitoring() {
-    console.log('🔍 Score monitoring disabled - use the "📝 Submit Score" button to add scores manually');
-    console.log('💡 This prevents false triggers from localStorage timestamps');
-    
-    // DISABLED: Automatic monitoring was detecting timestamps as scores
-    // Users should click the "Submit Score" button instead
-    return;
-    
-    /* ORIGINAL CODE - DISABLED
-    console.log('🔍 Starting score monitoring...');
-    console.log('👀 Will check localStorage every 500ms for score changes');
-    
-    // Log all localStorage keys on start for debugging
-    setTimeout(() => {
-        const keys = Object.keys(localStorage);
-        console.log('📦 Current localStorage keys:', keys);
-        keys.forEach(key => {
-            const value = localStorage.getItem(key);
-            const displayValue = (value && typeof value === 'string' && value.length > 100) 
-                ? value.substring(0, 100) + '...' 
-                : value;
-            console.log(`   ${key} =`, displayValue);
-        });
-        if (localStorage.length === 0) {
-            console.log('⚠️ localStorage is empty - game may not have started yet');
-        }
-    }, 2000);
-    
-    // Check every 500ms for score changes in localStorage
-    scoreCheckInterval = setInterval(() => {
+// METHOD 1: Monitor DOM for score display
+function monitorDOMForScore() {
+    setInterval(() => {
         try {
-            // Check various possible localStorage keys that Unity games commonly use
-            const possibleKeys = [
-                'SnowRider3D_HighScore',
-                'SnowRider3D_Score',
-                'highScore',
-                'score',
-                'gameScore',
-                'playerScore',
-                'bestScore'
+            // Look for common score display patterns in the page
+            const possibleScoreElements = [
+                ...document.querySelectorAll('[class*="score" i]'),
+                ...document.querySelectorAll('[id*="score" i]'),
+                ...document.querySelectorAll('div, span, p')
             ];
             
-            // Also check all localStorage keys for score-related entries
+            for (const el of possibleScoreElements) {
+                if (!el.textContent) continue;
+                
+                // Look for patterns like "Score: 1234" or "1234 points"
+                const text = el.textContent.trim();
+                const scoreMatch = text.match(/(?:score|points?|total)[\s:]*(\d{3,})/i) || 
+                                 text.match(/^(\d{3,})$/);
+                
+                if (scoreMatch) {
+                    const score = parseInt(scoreMatch[1]);
+                    if (isLikelyScore(score)) {
+                        console.log(`🔍 DOM score found in element:`, el, `Score: ${score}`);
+                        submitScoreToLeaderboard(score);
+                    }
+                }
+            }
+        } catch (e) {
+            console.log('⚠️ DOM monitoring error:', e);
+        }
+    }, SCORE_CONFIG.domCheckInterval);
+}
+
+// METHOD 2: Monitor localStorage with smart filtering
+function monitorLocalStorage() {
+    setInterval(() => {
+        try {
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
-                if (key && (key.toLowerCase().includes('score') || key.toLowerCase().includes('snowrider') || key.toLowerCase().includes('unity'))) {
-                    if (!possibleKeys.includes(key)) {
-                        possibleKeys.push(key);
+                if (!key) continue;
+                
+                // Only check keys that might contain scores
+                if (key.toLowerCase().includes('score') || 
+                    key.toLowerCase().includes('highscore') ||
+                    key.toLowerCase().includes('bestscore')) {
+                    
+                    const value = localStorage.getItem(key);
+                    const score = extractScore(value);
+                    
+                    if (score) {
+                        console.log(`💾 Found score in localStorage['${key}']:`, score);
+                        submitScoreToLeaderboard(score);
                     }
                 }
             }
+        } catch (e) {
+            console.log('⚠️ localStorage monitoring error:', e);
+        }
+    }, SCORE_CONFIG.storageCheckInterval);
+}
+
+// METHOD 3: Intercept localStorage.setItem
+function interceptLocalStorage() {
+    const originalSetItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function(key, value) {
+        originalSetItem.call(this, key, value);
+        
+        // Only check score-related keys
+        if (key && (key.toLowerCase().includes('score') || 
+                   key.toLowerCase().includes('high') ||
+                   key.toLowerCase().includes('best'))) {
             
-            // Check each possible key
-            for (const key of possibleKeys) {
-                const raw = localStorage.getItem(key);
-                if (raw !== null) {
-                    const score = extractScore(raw);
-                    if (score && score > 0) {
-                        const isNew = score !== lastScore || (Date.now() - lastScoreTime) > 5000;
-                        if (isNew && score >= 50) {
-                            console.log(`🎯 Score detected from ${key}:`, score);
-                            lastScore = score;
-                            lastScoreTime = Date.now();
-                            if (window.leaderboard) {
-                                console.log('✅ Triggering leaderboard with score:', score);
-                                window.leaderboard.checkAndAddScore(score);
-                            } else {
-                                console.error('❌ Leaderboard not available!');
-                            }
-                        }
-                    }
-                }
+            console.log(`📝 localStorage.setItem('${key}', '${value}')`);
+            
+            const score = extractScore(value);
+            if (score) {
+                console.log(`🎯 Score detected from setItem:`, score);
+                submitScoreToLeaderboard(score);
             }
-            
-            // Also monitor IndexedDB if Unity uses it
-            checkIndexedDB();
-            
-        } catch (e) {
-            console.error('❌ Score monitoring error:', e);
         }
-    }, 500);
+    };
 }
 
-// Check IndexedDB for Unity data
-let unityDB = null;
-let isMonitoringIndexedDB = false;
-
-async function checkIndexedDB() {
-    if (isMonitoringIndexedDB) return;
-    
-    if (window.indexedDB) {
-        try {
-            // Try to open the UnityCache database
-            const dbRequest = indexedDB.open('UnityCache');
+// METHOD 4: Monitor IndexedDB (UnityCache)
+async function monitorIndexedDB() {
+    try {
+        const dbs = await indexedDB.databases();
+        
+        for (const dbInfo of dbs) {
+            if (!dbInfo.name || dbInfo.name.includes('firebaseLocalStorageDb')) continue;
             
-            dbRequest.onsuccess = function(event) {
-                unityDB = event.target.result;
-                console.log('✅ Connected to UnityCache database');
-                isMonitoringIndexedDB = true;
+            try {
+                const db = await new Promise((resolve, reject) => {
+                    const request = indexedDB.open(dbInfo.name);
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => reject(request.error);
+                });
                 
-                // List all object stores
-                const storeNames = Array.from(unityDB.objectStoreNames);
-                console.log('📦 UnityCache stores:', storeNames);
+                const storeNames = Array.from(db.objectStoreNames);
                 
-                // Start monitoring the database
-                monitorUnityDB();
-            };
-            
-            dbRequest.onerror = function(event) {
-                console.log('⚠️ Could not open UnityCache:', event.target.error);
-            };
-        } catch (e) {
-            console.log('⚠️ IndexedDB access error:', e);
-        }
-    }
-}
-
-async function monitorUnityDB() {
-    if (!unityDB) return;
-    
-    setInterval(async () => {
-        try {
-            const storeNames = Array.from(unityDB.objectStoreNames);
-            
-            for (const storeName of storeNames) {
-                try {
-                    const transaction = unityDB.transaction(storeName, 'readonly');
-                    const store = transaction.objectStore(storeName);
+                for (const storeName of storeNames) {
+                    const tx = db.transaction(storeName, 'readonly');
+                    const store = tx.objectStore(storeName);
                     const request = store.getAll();
                     
-                    request.onsuccess = function() {
+                    request.onsuccess = () => {
                         const data = request.result;
-                        if (data && data.length > 0) {
-                            // Search through all data for score-like values
-                            for (const item of data) {
-                                const score = findNumberInObject(item);
-                                if (score && score >= 50) {
-                                    const isNew = score !== lastScore || (Date.now() - lastScoreTime) > 5000;
-                                    if (isNew) {
-                                        console.log(`🎯 Score found in IndexedDB ${storeName}:`, score);
-                                        lastScore = score;
-                                        lastScoreTime = Date.now();
-                                        if (window.leaderboard) {
-                                            console.log('✅ Triggering leaderboard with score:', score);
-                                            window.leaderboard.checkAndAddScore(score);
-                                        }
-                                    }
-                                }
+                        for (const item of data) {
+                            const score = extractScore(item);
+                            if (score) {
+                                console.log(`🗄️ Score found in IndexedDB['${dbInfo.name}']['${storeName}']:`, score);
+                                submitScoreToLeaderboard(score);
                             }
                         }
                     };
-                } catch (e) {
-                    // Store might not be accessible
                 }
-            }
-        } catch (e) {
-            console.log('⚠️ Error monitoring UnityDB:', e);
-        }
-    }, 1000); // Check every second
-}
-
-// Intercept Unity PlayerPrefs operations
-const originalSetItem = localStorage.setItem;
-localStorage.setItem = function(key, value) {
-    originalSetItem.apply(this, arguments);
-    
-    console.log(`💾 localStorage.setItem called: ${key} =`, value);
-    
-    // DISABLED: Automatic score detection was triggering on timestamps
-    // Use the manual "Submit Score" button instead
-    /*
-    // Check if this is a score-related key
-    if (key && (key.toLowerCase().includes('score') || key.toLowerCase().includes('snowrider') || key.toLowerCase().includes('unity'))) {
-        const score = extractScore(value);
-        if (score && score > 0) {
-            const isNew = score !== lastScore || (Date.now() - lastScoreTime) > 5000;
-            if (isNew) {
-                console.log(`🎯 Score change detected via setItem (${key}):`, score);
-                lastScore = score;
-                lastScoreTime = Date.now();
-                if (score >= 50 && window.leaderboard) {
-                    console.log('⏱️ Scheduling leaderboard popup in 1 second...');
-                    setTimeout(() => {
-                        console.log('✅ Triggering leaderboard with score:', score);
-                        window.leaderboard.checkAndAddScore(score);
-                    }, 1000); // Delay to ensure game has finished
-                } else if (!window.leaderboard) {
-                    console.error('❌ Leaderboard not available!');
-                }
+                
+                db.close();
+            } catch (e) {
+                // Silent fail for databases we can't access
             }
         }
+    } catch (e) {
+        console.log('⚠️ IndexedDB monitoring error:', e);
     }
-    */
-};
-
-// Start monitoring when the page loads
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        startScoreMonitoring();
-        checkIndexedDB();
-    });
-} else {
-    startScoreMonitoring();
-    checkIndexedDB();
 }
 
-// Alternative: Monitor Unity instance for score changes
-function monitorUnityScores() {
-    if (typeof gameInstance !== 'undefined' && gameInstance) {
-        // Try to get score from Unity (this requires Unity to expose it)
-        try {
-            // Example: gameInstance.SendMessage('GameManager', 'GetScore');
-            // This would require Unity to send the score back via Application.ExternalCall
-        } catch (e) {
-            console.log('Unity score monitoring not available');
+// Initialize all monitoring methods
+function startScoreMonitoring() {
+    console.log('🚀 Enhanced Score Monitoring Started');
+    console.log(`⚙️ Config: minScore=${SCORE_CONFIG.minScore}, maxScore=${SCORE_CONFIG.maxScore}`);
+    console.log('📡 Active detection methods:');
+    console.log('   1. Unity direct callback (window.SubmitScoreToLeaderboard)');
+    console.log('   2. DOM element monitoring');
+    console.log('   3. localStorage monitoring with timestamp filtering');
+    console.log('   4. localStorage.setItem interception');
+    console.log('   5. IndexedDB scanning');
+    
+    // Collect initial timestamps to avoid false positives
+    setTimeout(() => {
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            const value = localStorage.getItem(key);
+            const num = parseInt(value);
+            if (!isNaN(num) && String(num).length === 13) {
+                knownTimestamps.add(num);
+            }
         }
-    }
+        console.log(`🕐 Registered ${knownTimestamps.size} known timestamps to ignore`);
+    }, 1000);
+    
+    // Start all monitoring methods
+    interceptLocalStorage();
+    monitorDOMForScore();
+    monitorLocalStorage();
+    
+    // Check IndexedDB periodically
+    setInterval(monitorIndexedDB, 5000);
+    
+    console.log('✅ All monitoring systems active');
 }
 
 // Helper function to manually test the leaderboard
@@ -332,49 +325,19 @@ window.testLeaderboard = function() {
     ];
 
     console.log('Adding test scores to leaderboard...');
-    testScores.forEach((entry, index) => {
-        setTimeout(() => {
-            if (window.leaderboard) {
-                window.leaderboard.currentScore = entry.score;
-                window.leaderboard.playerNameInput.value = entry.name;
-                window.leaderboard.submitScore();
-                console.log(`Added: ${entry.name} - ${entry.score}`);
-            }
-        }, index * 100);
-    });
-    
-    setTimeout(() => {
-        console.log('Test complete! Click the leaderboard button to view.');
-        if (window.leaderboard) {
-            window.leaderboard.showLeaderboard();
-        }
-    }, testScores.length * 100 + 500);
-};
-
-// Add a manual submit button for testing
-window.manualSubmitScore = function(score) {
-    if (!score) {
-        score = prompt('Enter a score to submit:');
-        score = parseInt(score);
-    }
-    if (score && !isNaN(score) && score > 0) {
-        console.log('Manually submitting score:', score);
-        if (window.leaderboard) {
-            window.leaderboard.checkAndAddScore(score);
-        }
+    if (window.leaderboard) {
+        testScores.forEach(entry => {
+            submitScoreToLeaderboard(entry.score);
+        });
     }
 };
 
-// Monitor for game over events
-window.addEventListener('keydown', function(e) {
-    // Press 'L' key to manually trigger score submission (for testing)
-    if (e.key === 'l' || e.key === 'L') {
-        const score = prompt('Enter your score:');
-        if (score && !isNaN(parseInt(score))) {
-            window.manualSubmitScore(parseInt(score));
-        }
-    }
-});
+// Start monitoring when the page loads
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startScoreMonitoring);
+} else {
+    startScoreMonitoring();
+}
 
 // Log when the bridge is ready
 console.log('════════════════════════════════════════════════════════════');
@@ -382,9 +345,8 @@ console.log('🏆 Unity-Leaderboard Bridge Initialized');
 console.log('════════════════════════════════════════════════════════════');
 console.log('📋 Testing commands:');
 console.log('   testLeaderboard()      - Add sample scores');
-console.log('   manualSubmitScore()    - Submit a score manually');
-console.log('   Press "L" during game  - Quick score entry');
+console.log('   Press "📝 Submit Score" button - Manual score entry');
 console.log('════════════════════════════════════════════════════════════');
-console.log('🔍 Auto-detection: Monitoring localStorage for score changes');
+console.log('🔍 Auto-detection: Active with smart timestamp filtering');
 console.log('💡 Watch this console - you\'ll see logs when scores are detected!');
 console.log('════════════════════════════════════════════════════════════');
