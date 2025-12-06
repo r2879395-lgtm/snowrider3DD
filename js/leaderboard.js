@@ -163,10 +163,10 @@ class Leaderboard {
     updateConnectionStatus(online) {
         if (this.connectionStatus) {
             if (online) {
-                this.connectionStatus.textContent = '✓ Online';
+                this.connectionStatus.textContent = '🟢 Online';
                 this.connectionStatus.className = 'status-badge online';
             } else {
-                this.connectionStatus.textContent = '⚠ Offline';
+                this.connectionStatus.textContent = '🔴 Offline';
                 this.connectionStatus.className = 'status-badge offline';
             }
         }
@@ -174,8 +174,18 @@ class Leaderboard {
 
     updatePlayerCount() {
         if (this.playerCount) {
-            const count = this.onlineScores.length;
-            this.playerCount.textContent = `${count} player${count !== 1 ? 's' : ''}`;
+            // Count unique players by unique names
+            const uniquePlayers = new Set();
+            this.onlineScores.forEach(score => {
+                if (score.name) {
+                    uniquePlayers.add(score.name.toLowerCase());
+                }
+            });
+            
+            const count = uniquePlayers.size;
+            const scoreCount = this.onlineScores.length;
+            this.playerCount.textContent = `👥 ${count} player${count !== 1 ? 's' : ''} | 📊 ${scoreCount} score${scoreCount !== 1 ? 's' : ''}`;
+            console.log(`📊 Leaderboard: ${count} unique players, ${scoreCount} total scores`);
         }
     }
 

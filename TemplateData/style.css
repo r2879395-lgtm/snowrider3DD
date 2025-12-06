@@ -307,6 +307,7 @@ body {
     font-size: 12px;
     font-weight: bold;
     background: rgba(255, 255, 255, 0.1);
+    margin-right: 10px;
 }
 
 .status-badge.online {
@@ -321,7 +322,8 @@ body {
 
 .player-count {
     font-size: 12px;
-    color: rgba(255, 255, 255, 0.7);
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: 500;
 }
 
 .leaderboard-tabs {
