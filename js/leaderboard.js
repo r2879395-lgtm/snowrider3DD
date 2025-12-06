@@ -9,11 +9,18 @@ class Leaderboard {
         this.database = null;
         this.leaderboardRef = null;
         this.onlineScores = [];
+        this.activePlayersRef = null;
+        this.activePlayers = 0;
+        this.playerSessionId = this.generateSessionId();
         
         // Bind event handler methods
         this.stopUnityKeys = this.stopUnityKeys.bind(this);
         
         this.init();
+    }
+
+    generateSessionId() {
+        return 'player_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     }
 
     init() {
@@ -65,6 +72,11 @@ class Leaderboard {
             }
         });
 
+        // Track when user closes browser/tab - remove from active players
+        window.addEventListener('beforeunload', () => {
+            this.removeActivePlayer();
+        });
+
         // Listen for Unity messages
         this.setupUnityListener();
     }
@@ -83,8 +95,30 @@ class Leaderboard {
             try {
                 this.database = window.firebaseConfig.database;
                 this.leaderboardRef = this.database.ref('leaderboard');
+                this.activePlayersRef = this.database.ref('activePlayers');
                 this.isOnline = true;
                 console.log('📡 Firebase reference created');
+
+                // Register as active player
+                const playerData = {
+                    timestamp: firebase.database.ServerValue.TIMESTAMP,
+                    sessionId: this.playerSessionId
+                };
+                
+                this.activePlayersRef.child(this.playerSessionId).set(playerData)
+                    .catch(err => console.log('Error registering active player:', err));
+                
+                // Remove this player when they disconnect
+                this.activePlayersRef.child(this.playerSessionId).onDisconnect().remove();
+                
+                // Update active player timestamp every 30 seconds to keep session alive
+                this.heartbeatInterval = setInterval(() => {
+                    if (this.activePlayersRef) {
+                        this.activePlayersRef.child(this.playerSessionId).update({
+                            timestamp: firebase.database.ServerValue.TIMESTAMP
+                        }).catch(err => console.log('Error updating player timestamp:', err));
+                    }
+                }, 30000);
                 
                 // Listen for real-time updates
                 this.leaderboardRef.orderByChild('score').limitToLast(100).on('value', (snapshot) => {
@@ -112,6 +146,23 @@ class Leaderboard {
                 }, (error) => {
                     console.error('❌ Firebase listener error:', error);
                     this.fallbackToLocalOnly();
+                });
+
+                // Listen for active players count
+                this.activePlayersRef.on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (!data) {
+                        this.activePlayers = 0;
+                    } else {
+                        const now = Date.now();
+                        const validPlayers = Object.values(data).filter(player => {
+                            // Consider player active if timestamp is within last 5 minutes
+                            const timeSinceLastSeen = now - player.timestamp;
+                            return timeSinceLastSeen < 5 * 60 * 1000;
+                        });
+                        this.activePlayers = validPlayers.length;
+                    }
+                    this.updatePlayerCountDisplay();
                 });
 
                 this.updateConnectionStatus(true);
@@ -186,6 +237,27 @@ class Leaderboard {
             const scoreCount = this.onlineScores.length;
             this.playerCount.textContent = `👥 ${count} player${count !== 1 ? 's' : ''} | 📊 ${scoreCount} score${scoreCount !== 1 ? 's' : ''}`;
             console.log(`📊 Leaderboard: ${count} unique players, ${scoreCount} total scores`);
+        }
+    }
+
+    updatePlayerCountDisplay() {
+        if (this.connectionStatus) {
+            const currentText = this.connectionStatus.textContent;
+            // Update connection status to show active players
+            if (this.isOnline) {
+                this.connectionStatus.textContent = `🟢 Online | 🎮 ${this.activePlayers} playing`;
+                this.connectionStatus.style.color = '#44ff44';
+            } else {
+                this.connectionStatus.textContent = '🟡 Offline';
+                this.connectionStatus.style.color = '#ffaa00';
+            }
+        }
+    }
+
+    removeActivePlayer() {
+        if (this.activePlayersRef && this.playerSessionId) {
+            this.activePlayersRef.child(this.playerSessionId).remove()
+                .catch(err => console.log('Error removing active player:', err));
         }
     }
 
@@ -382,6 +454,7 @@ class Leaderboard {
         // Default to global when online, otherwise local
         this.setTab(this.isOnline ? 'global' : 'local');
         this.leaderboardModal.style.display = 'block';
+        this.updatePlayerCount();
     }
 
     setTab(tab) {
