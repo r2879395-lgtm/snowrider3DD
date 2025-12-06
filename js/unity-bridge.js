@@ -108,7 +108,12 @@ function startScoreMonitoring() {
     
     // Log all localStorage keys on start for debugging
     setTimeout(() => {
-        console.log('📦 Current localStorage keys:', Object.keys(localStorage));
+        const keys = Object.keys(localStorage);
+        console.log('📦 Current localStorage keys:', keys);
+        keys.forEach(key => {
+            const value = localStorage.getItem(key);
+            console.log(`   ${key} = ${value.substring ? value.substring(0, 100) : value}`);
+        });
         if (localStorage.length === 0) {
             console.log('⚠️ localStorage is empty - game may not have started yet');
         }
