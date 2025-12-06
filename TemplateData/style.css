@@ -149,7 +149,25 @@ body {
     transition: all 0.3s ease;
 }
 
-.leaderboard-btn:hover {
+.manual-score-btn {
+    position: fixed;
+    top: 70px;
+    right: 20px;
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    font-size: 16px;
+    font-weight: bold;
+    border-radius: 25px;
+    cursor: pointer;
+    z-index: 1000;
+    box-shadow: 0 4px 15px rgba(240, 147, 251, 0.4);
+    transition: all 0.3s ease;
+}
+
+.leaderboard-btn:hover,
+.manual-score-btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
 }
@@ -387,11 +405,19 @@ body {
     font-size: 16px;
     outline: none;
     transition: all 0.3s ease;
+    pointer-events: auto;
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
+    z-index: 10000;
+    position: relative;
 }
 
 #playerName:focus {
     border-color: #667eea;
     background: rgba(255, 255, 255, 0.2);
+    z-index: 10000;
 }
 
 #playerName::placeholder {

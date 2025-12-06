@@ -15,6 +15,7 @@ class Leaderboard {
     init() {
         // Get DOM elements
         this.leaderboardBtn = document.getElementById('leaderboardBtn');
+        this.manualScoreBtn = document.getElementById('manualScoreBtn');
         this.leaderboardModal = document.getElementById('leaderboardModal');
         this.scoreModal = document.getElementById('scoreModal');
         this.closeBtn = document.querySelector('.close');
@@ -29,6 +30,7 @@ class Leaderboard {
 
         // Bind events
         this.leaderboardBtn.addEventListener('click', () => this.showLeaderboard());
+        this.manualScoreBtn.addEventListener('click', () => this.promptManualScore());
         this.closeBtn.addEventListener('click', () => this.hideLeaderboard());
         this.submitScoreBtn.addEventListener('click', () => this.submitScore());
         this.clearLeaderboardBtn.addEventListener('click', () => this.clearLeaderboard());
@@ -200,14 +202,32 @@ class Leaderboard {
         }
         this.scoreModal.style.display = 'block';
 
-        // Try to reclaim focus from the Unity canvas so typing works
+        // Aggressively reclaim focus from Unity canvas
         try {
+            // Blur the Unity canvas
+            const canvas = document.querySelector('#gameContainer canvas');
+            if (canvas) {
+                canvas.blur();
+                canvas.style.pointerEvents = 'none';
+            }
+            
+            // Remove focus from active element
             if (document.activeElement && document.activeElement.blur) {
                 document.activeElement.blur();
             }
+            
+            // Focus the input with multiple attempts
             if (this.playerNameInput) {
-                // Slight delay helps on some browsers after WebGL focus
-                setTimeout(() => this.playerNameInput.focus(), 50);
+                setTimeout(() => {
+                    this.playerNameInput.focus();
+                    this.playerNameInput.click();
+                }, 50);
+                setTimeout(() => {
+                    this.playerNameInput.focus();
+                }, 200);
+                setTimeout(() => {
+                    this.playerNameInput.focus();
+                }, 500);
             }
         } catch (e) {
             console.log('Focus handling issue:', e);
@@ -216,6 +236,11 @@ class Leaderboard {
 
     hideScoreModal() {
         this.scoreModal.style.display = 'none';
+        // Re-enable canvas pointer events
+        const canvas = document.querySelector('#gameContainer canvas');
+        if (canvas) {
+            canvas.style.pointerEvents = 'auto';
+        }
     }
 
     async submitScore() {
@@ -343,6 +368,18 @@ class Leaderboard {
         this.currentScore = score;
         this.playerNameInput.value = name;
         this.submitScore();
+    }
+
+    promptManualScore() {
+        const score = prompt('Enter your score:');
+        if (score && !isNaN(parseInt(score))) {
+            const scoreNum = parseInt(score);
+            if (scoreNum > 0) {
+                this.checkAndAddScore(scoreNum);
+            } else {
+                alert('Please enter a valid score greater than 0');
+            }
+        }
     }
 }
 
