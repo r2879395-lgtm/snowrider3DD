@@ -170,24 +170,81 @@ function startScoreMonitoring() {
 }
 
 // Check IndexedDB for Unity data
-function checkIndexedDB() {
+let unityDB = null;
+let isMonitoringIndexedDB = false;
+
+async function checkIndexedDB() {
+    if (isMonitoringIndexedDB) return;
+    
     if (window.indexedDB) {
         try {
-            const request = indexedDB.databases();
-            if (request) {
-                request.then(databases => {
-                    databases.forEach(db => {
-                        if (db.name && db.name.toLowerCase().includes('unity')) {
-                            // Found Unity database, could check it here
-                            console.log('Found Unity database:', db.name);
-                        }
-                    });
-                });
-            }
+            // Try to open the UnityCache database
+            const dbRequest = indexedDB.open('UnityCache');
+            
+            dbRequest.onsuccess = function(event) {
+                unityDB = event.target.result;
+                console.log('✅ Connected to UnityCache database');
+                isMonitoringIndexedDB = true;
+                
+                // List all object stores
+                const storeNames = Array.from(unityDB.objectStoreNames);
+                console.log('📦 UnityCache stores:', storeNames);
+                
+                // Start monitoring the database
+                monitorUnityDB();
+            };
+            
+            dbRequest.onerror = function(event) {
+                console.log('⚠️ Could not open UnityCache:', event.target.error);
+            };
         } catch (e) {
-            // IndexedDB.databases() not supported in all browsers
+            console.log('⚠️ IndexedDB access error:', e);
         }
     }
+}
+
+async function monitorUnityDB() {
+    if (!unityDB) return;
+    
+    setInterval(async () => {
+        try {
+            const storeNames = Array.from(unityDB.objectStoreNames);
+            
+            for (const storeName of storeNames) {
+                try {
+                    const transaction = unityDB.transaction(storeName, 'readonly');
+                    const store = transaction.objectStore(storeName);
+                    const request = store.getAll();
+                    
+                    request.onsuccess = function() {
+                        const data = request.result;
+                        if (data && data.length > 0) {
+                            // Search through all data for score-like values
+                            for (const item of data) {
+                                const score = findNumberInObject(item);
+                                if (score && score >= 50) {
+                                    const isNew = score !== lastScore || (Date.now() - lastScoreTime) > 5000;
+                                    if (isNew) {
+                                        console.log(`🎯 Score found in IndexedDB ${storeName}:`, score);
+                                        lastScore = score;
+                                        lastScoreTime = Date.now();
+                                        if (window.leaderboard) {
+                                            console.log('✅ Triggering leaderboard with score:', score);
+                                            window.leaderboard.checkAndAddScore(score);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    };
+                } catch (e) {
+                    // Store might not be accessible
+                }
+            }
+        } catch (e) {
+            console.log('⚠️ Error monitoring UnityDB:', e);
+        }
+    }, 1000); // Check every second
 }
 
 // Intercept Unity PlayerPrefs operations
@@ -222,9 +279,13 @@ localStorage.setItem = function(key, value) {
 
 // Start monitoring when the page loads
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', startScoreMonitoring);
+    document.addEventListener('DOMContentLoaded', () => {
+        startScoreMonitoring();
+        checkIndexedDB();
+    });
 } else {
     startScoreMonitoring();
+    checkIndexedDB();
 }
 
 // Alternative: Monitor Unity instance for score changes
