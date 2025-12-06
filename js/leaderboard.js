@@ -593,8 +593,21 @@ class Leaderboard {
     showWelcomeModal() {
         if (this.welcomeModal) {
             this.welcomeModal.style.display = 'block';
+            
+            // Blur Unity canvas to prevent it from capturing keyboard input
+            const unityCanvas = document.querySelector('#gameContainer canvas');
+            if (unityCanvas) {
+                unityCanvas.blur();
+                unityCanvas.style.pointerEvents = 'none';
+            }
+            
+            // Focus the input after a short delay
             if (this.welcomePlayerNameInput) {
-                setTimeout(() => this.welcomePlayerNameInput.focus(), 100);
+                setTimeout(() => {
+                    this.welcomePlayerNameInput.focus();
+                    // Ensure input can receive keyboard events
+                    this.welcomePlayerNameInput.click();
+                }, 200);
             }
         }
     }
@@ -616,6 +629,12 @@ class Leaderboard {
             this.activePlayersRef.child(this.playerSessionId).update({
                 name: name
             }).catch(err => console.log('Error updating player name:', err));
+        }
+
+        // Re-enable Unity canvas
+        const unityCanvas = document.querySelector('#gameContainer canvas');
+        if (unityCanvas) {
+            unityCanvas.style.pointerEvents = 'auto';
         }
 
         // Hide welcome modal

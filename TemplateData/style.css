@@ -217,7 +217,7 @@ body {
 .modal {
     display: none;
     position: fixed;
-    z-index: 2000;
+    z-index: 10000;
     left: 0;
     top: 0;
     width: 100%;
@@ -266,6 +266,9 @@ body {
     color: #000 !important;
     text-align: center;
     max-width: 400px;
+    position: relative;
+    z-index: 10001;
+    pointer-events: auto;
 }
 
 .welcome-modal h2 {
@@ -287,6 +290,10 @@ body {
     color: #000;
     box-sizing: border-box;
     font-weight: bold;
+    pointer-events: auto;
+    cursor: text;
+    position: relative;
+    z-index: 10002;
 }
 
 .welcome-input::placeholder {
