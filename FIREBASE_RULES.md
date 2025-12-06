@@ -41,8 +41,6 @@
       ".read": true,
       ".write": true,
       "$sessionId": {
-        ".validate": "newData.hasChildren(['sessionId', 'timestamp', 'name'])",
-        
         "sessionId": {
           ".validate": "newData.isString() && newData.val().length > 0"
         },
