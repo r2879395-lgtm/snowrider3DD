@@ -16,7 +16,7 @@ const SCORE_CONFIG = {
     debounceTime: 2000,         // Milliseconds to wait before submitting same score again
     domCheckInterval: 500,      // How often to check DOM for score display
     storageCheckInterval: 1000, // How often to check storage
-    enableOcr: true,            // Turn on canvas OCR monitoring
+    enableOcr: false,           // OCR disabled - Unity WebGL canvas cannot be captured
     ocrInterval: 2500           // How often to OCR the canvas (ms)
 };
 
@@ -792,25 +792,22 @@ function wireScanButton() {
     }
     console.log('✅ Scan button found, adding click handler');
     btn.addEventListener('click', async () => {
-        console.log('🔘 Scan button clicked');
-        btn.disabled = true;
-        btn.textContent = 'Scanning...';
-        try {
-            console.log('⏳ Loading Tesseract...');
-            await loadTesseract();
-            console.log('📷 Running OCR scan...');
-            const score = await runCanvasOcr({ submit: true });
-            if (score) {
-                console.log(`✅ Scan button detected score: ${score}`);
-            } else {
-                console.log('ℹ️ Scan button did not find a score - no numbers matched criteria');
-            }
-        } catch (e) {
-            console.log('⚠️ Scan error:', e);
-        } finally {
-            btn.disabled = false;
-            btn.textContent = '🔍 Scan Score';
+        console.log('🔘 Manual Score Submit button clicked');
+        // Show a dialog to manually enter score
+        const scoreStr = prompt('📊 Enter your score:');
+        if (!scoreStr) {
+            console.log('ℹ️ Score entry cancelled');
+            return;
         }
+        
+        const score = parseInt(scoreStr);
+        if (isNaN(score) || score < SCORE_CONFIG.minScore || score > SCORE_CONFIG.maxScore) {
+            alert(`❌ Invalid score. Must be between ${SCORE_CONFIG.minScore} and ${SCORE_CONFIG.maxScore}`);
+            return;
+        }
+        
+        console.log(`✅ Submitting manual score: ${score}`);
+        submitScoreToLeaderboard(score);
     });
 }
 
