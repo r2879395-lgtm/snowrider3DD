@@ -277,6 +277,28 @@ body {
     color: #222;
 }
 
+.welcome-input {
+    width: 100%;
+    padding: 15px;
+    font-size: 16px;
+    border-radius: 10px;
+    border: 3px solid #000;
+    background: rgba(255, 255, 255, 0.9);
+    color: #000;
+    box-sizing: border-box;
+    font-weight: bold;
+}
+
+.welcome-input::placeholder {
+    color: #666;
+}
+
+.welcome-input:focus {
+    outline: none;
+    border-color: #000;
+    background: #fff;
+}
+
 .close {
     color: #aaa;
     float: right;
