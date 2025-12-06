@@ -34,6 +34,8 @@ class Leaderboard {
         this.connectionStatus = document.getElementById('connectionStatus');
         this.playerCount = document.getElementById('playerCount');
         this.activeBadge = document.getElementById('activePlayers');
+        this.playersListContent = document.getElementById('playersListContent');
+        this.currentPlayerName = localStorage.getItem('snowRider3D_playerName') || 'Anonymous';
 
         // Initialize Firebase/Online database
         this.initializeOnlineDatabase();
@@ -103,11 +105,12 @@ class Leaderboard {
                 // Register as active player
                 const playerData = {
                     timestamp: firebase.database.ServerValue.TIMESTAMP,
-                    sessionId: this.playerSessionId
+                    sessionId: this.playerSessionId,
+                    name: this.currentPlayerName
                 };
                 
                 this.activePlayersRef.child(this.playerSessionId).set(playerData)
-                    .then(() => console.log('✓ Registered as active player:', this.playerSessionId))
+                    .then(() => console.log('✓ Registered as active player:', this.playerSessionId, this.currentPlayerName))
                     .catch(err => console.log('Error registering active player:', err));
                 
                 // Remove this player when they disconnect
@@ -117,7 +120,8 @@ class Leaderboard {
                 this.heartbeatInterval = setInterval(() => {
                     if (this.activePlayersRef) {
                         this.activePlayersRef.child(this.playerSessionId).update({
-                            timestamp: firebase.database.ServerValue.TIMESTAMP
+                            timestamp: firebase.database.ServerValue.TIMESTAMP,
+                            name: this.currentPlayerName
                         }).catch(err => console.log('Error updating player timestamp:', err));
                     }
                 }, 15000);
@@ -167,6 +171,7 @@ class Leaderboard {
                     
                     if (!data) {
                         this.activePlayers = 0;
+                        this.activePlayersList = [];
                     } else {
                         const now = Date.now();
                         const allPlayers = Object.values(data);
@@ -176,11 +181,12 @@ class Leaderboard {
                             // Consider player active if timestamp is within last 5 minutes
                             const timeSinceLastSeen = now - player.timestamp;
                             const isActive = timeSinceLastSeen < 5 * 60 * 1000;
-                            console.log(`   Player: ${player.sessionId}, age: ${(timeSinceLastSeen / 1000).toFixed(1)}s, active: ${isActive}`);
+                            console.log(`   Player: ${player.name || player.sessionId}, age: ${(timeSinceLastSeen / 1000).toFixed(1)}s, active: ${isActive}`);
                             return isActive;
                         });
                         this.activePlayers = validPlayers.length;
-                        console.log(`🎮 Active players: ${this.activePlayers}`);
+                        this.activePlayersList = validPlayers.map(p => p.name || 'Anonymous');
+                        console.log(`🎮 Active players: ${this.activePlayers}`, this.activePlayersList);
                     }
                     this.updatePlayerCountDisplay();
                 });
@@ -276,6 +282,18 @@ class Leaderboard {
         // Update the prominent badge
         if (this.activeBadge) {
             this.activeBadge.textContent = `🎮 ${this.activePlayers} playing`;
+        }
+        
+        // Update the players list dropdown
+        if (this.playersListContent) {
+            if (!this.activePlayersList || this.activePlayersList.length === 0) {
+                this.playersListContent.innerHTML = '<div style="color: #999; font-style: italic;">No players online</div>';
+            } else {
+                const playerItems = this.activePlayersList.map(name => 
+                    `<div class="player-item">👤 ${name}</div>`
+                ).join('');
+                this.playersListContent.innerHTML = playerItems;
+            }
         }
     }
 
@@ -436,6 +454,17 @@ class Leaderboard {
             // Fallback prompt if input is unavailable
             const promptName = (typeof prompt === 'function') ? prompt('Enter your name for the leaderboard:', '') : '';
             playerName = (promptName && promptName.trim()) ? promptName.trim() : 'Anonymous';
+        }
+        
+        // Store player name for active player tracking
+        localStorage.setItem('snowRider3D_playerName', playerName);
+        this.currentPlayerName = playerName;
+        
+        // Update active player name in Firebase
+        if (this.activePlayersRef) {
+            this.activePlayersRef.child(this.playerSessionId).update({
+                name: playerName
+            }).catch(err => console.log('Error updating player name:', err));
         }
         
         if (this.currentScore > 0) {
