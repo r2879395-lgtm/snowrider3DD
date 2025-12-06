@@ -160,17 +160,11 @@ class Leaderboard {
     }
 
     setupUnityListener() {
-        // Listen for scores from Unity game
-        window.addEventListener('message', (event) => {
-            if (event.data && event.data.type === 'gameScore') {
-                this.checkAndAddScore(event.data.score);
-            }
-        });
-
-        // Alternative: Create a global function that Unity can call
-        window.submitGameScore = (score) => {
-            this.checkAndAddScore(score);
-        };
+        // Disabled: Automatic score detection from game
+        // Users must manually submit scores via the "➕ Submit Score" button
+        // This prevents duplicate prompts and gives users control over when/what scores to submit
+        
+        console.log('ℹ️ Automatic score detection disabled - use ➕ Submit Score button instead');
     }
 
     getScores() {
