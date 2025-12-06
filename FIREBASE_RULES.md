@@ -36,6 +36,21 @@
           ".validate": "newData.isNumber()"
         }
       }
+    },
+    "activePlayers": {
+      ".read": true,
+      ".write": true,
+      "$sessionId": {
+        ".validate": "newData.hasChildren(['sessionId', 'timestamp'])",
+        
+        "sessionId": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        },
+        
+        "timestamp": {
+          ".validate": "newData.isNumber()"
+        }
+      }
     }
   }
 }
@@ -48,6 +63,7 @@
 ✅ **Validates score format** - Must be 100-999,999,999
 ✅ **Validates name** - 1-50 characters
 ✅ **Requires all fields** - name, score, date, timestamp must be present
+✅ **Allows active player tracking** - sessionId, timestamp fields for `/activePlayers` node
 
 ## Testing After Setup
 
@@ -59,6 +75,7 @@ After publishing the rules:
 4. You should see: `✅ Write successful! Key: ...`
 5. Click "➕ Submit Score" and enter a test score
 6. Check the **Global** leaderboard tab - your score should appear!
+7. The active players badge (top-left) should show "🎮 1 playing"
 
 ## Optional: Add Authentication (More Secure)
 
