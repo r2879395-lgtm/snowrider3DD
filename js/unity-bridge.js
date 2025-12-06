@@ -103,7 +103,16 @@ function findNumberInObject(obj) {
 }
 
 function startScoreMonitoring() {
-    console.log('Starting score monitoring...');
+    console.log('🔍 Starting score monitoring...');
+    console.log('👀 Will check localStorage every 500ms for score changes');
+    
+    // Log all localStorage keys on start for debugging
+    setTimeout(() => {
+        console.log('📦 Current localStorage keys:', Object.keys(localStorage));
+        if (localStorage.length === 0) {
+            console.log('⚠️ localStorage is empty - game may not have started yet');
+        }
+    }, 2000);
     
     // Check every 500ms for score changes in localStorage
     scoreCheckInterval = setInterval(() => {
@@ -122,23 +131,30 @@ function startScoreMonitoring() {
             // Also check all localStorage keys for score-related entries
             for (let i = 0; i < localStorage.length; i++) {
                 const key = localStorage.key(i);
-                if (key && (key.toLowerCase().includes('score') || key.toLowerCase().includes('snowrider'))) {
-                    possibleKeys.push(key);
+                if (key && (key.toLowerCase().includes('score') || key.toLowerCase().includes('snowrider') || key.toLowerCase().includes('unity'))) {
+                    if (!possibleKeys.includes(key)) {
+                        possibleKeys.push(key);
+                    }
                 }
             }
             
             // Check each possible key
             for (const key of possibleKeys) {
                 const raw = localStorage.getItem(key);
-                const score = extractScore(raw);
-                if (score && score > 0) {
-                    const isNew = score !== lastScore || (Date.now() - lastScoreTime) > 5000;
-                    if (isNew && score >= 50) {
-                        console.log(`Score detected from ${key}:`, score);
-                        lastScore = score;
-                        lastScoreTime = Date.now();
-                        if (window.leaderboard) {
-                            window.leaderboard.checkAndAddScore(score);
+                if (raw !== null) {
+                    const score = extractScore(raw);
+                    if (score && score > 0) {
+                        const isNew = score !== lastScore || (Date.now() - lastScoreTime) > 5000;
+                        if (isNew && score >= 50) {
+                            console.log(`🎯 Score detected from ${key}:`, score);
+                            lastScore = score;
+                            lastScoreTime = Date.now();
+                            if (window.leaderboard) {
+                                console.log('✅ Triggering leaderboard with score:', score);
+                                window.leaderboard.checkAndAddScore(score);
+                            } else {
+                                console.error('❌ Leaderboard not available!');
+                            }
                         }
                     }
                 }
@@ -148,7 +164,7 @@ function startScoreMonitoring() {
             checkIndexedDB();
             
         } catch (e) {
-            console.log('Score monitoring error:', e);
+            console.error('❌ Score monitoring error:', e);
         }
     }, 500);
 }
@@ -179,19 +195,25 @@ const originalSetItem = localStorage.setItem;
 localStorage.setItem = function(key, value) {
     originalSetItem.apply(this, arguments);
     
+    console.log(`💾 localStorage.setItem called: ${key} =`, value);
+    
     // Check if this is a score-related key
-    if (key && (key.toLowerCase().includes('score') || key.toLowerCase().includes('snowrider'))) {
+    if (key && (key.toLowerCase().includes('score') || key.toLowerCase().includes('snowrider') || key.toLowerCase().includes('unity'))) {
         const score = extractScore(value);
         if (score && score > 0) {
             const isNew = score !== lastScore || (Date.now() - lastScoreTime) > 5000;
             if (isNew) {
-                console.log(`Score change detected via setItem (${key}):`, score);
+                console.log(`🎯 Score change detected via setItem (${key}):`, score);
                 lastScore = score;
                 lastScoreTime = Date.now();
                 if (score >= 50 && window.leaderboard) {
+                    console.log('⏱️ Scheduling leaderboard popup in 1 second...');
                     setTimeout(() => {
+                        console.log('✅ Triggering leaderboard with score:', score);
                         window.leaderboard.checkAndAddScore(score);
                     }, 1000); // Delay to ensure game has finished
+                } else if (!window.leaderboard) {
+                    console.error('❌ Leaderboard not available!');
                 }
             }
         }
@@ -274,11 +296,14 @@ window.addEventListener('keydown', function(e) {
 });
 
 // Log when the bridge is ready
-console.log('Unity-Leaderboard bridge initialized');
-console.log('═══════════════════════════════════════');
-console.log('Testing commands:');
-console.log('  testLeaderboard()     - Add sample scores');
-console.log('  manualSubmitScore()   - Submit a score manually');
-console.log('  Press "L" during game - Quick score entry');
-console.log('═══════════════════════════════════════');
-console.log('Auto-detection active: Monitoring localStorage for score changes');
+console.log('════════════════════════════════════════════════════════════');
+console.log('🏆 Unity-Leaderboard Bridge Initialized');
+console.log('════════════════════════════════════════════════════════════');
+console.log('📋 Testing commands:');
+console.log('   testLeaderboard()      - Add sample scores');
+console.log('   manualSubmitScore()    - Submit a score manually');
+console.log('   Press "L" during game  - Quick score entry');
+console.log('════════════════════════════════════════════════════════════');
+console.log('🔍 Auto-detection: Monitoring localStorage for score changes');
+console.log('💡 Watch this console - you\'ll see logs when scores are detected!');
+console.log('════════════════════════════════════════════════════════════');
