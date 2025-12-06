@@ -1,46 +1,39 @@
 # Firebase Security Rules for Snow Rider 3D Leaderboard
 
-## Setup Instructions
+## Setup Instructions (IMPORTANT!)
 
 1. Go to: https://console.firebase.google.com/
 2. Select your project: **snowrider-34d40**
 3. Navigate to: **Realtime Database** > **Rules** tab
-4. Replace the existing rules with the code below
-5. Click **Publish**
+4. **DELETE the default rules** (the `.read` and `.write` at root level)
+5. Copy **ONLY** the rules below and paste them
+6. Click **Publish** button
 
-## Security Rules
+## Working Security Rules (Public Writes Allowed)
 
 ```json
 {
   "rules": {
     "leaderboard": {
-      // Only authenticated users can read
-      ".read": "auth != null",
-      
-      // Anyone can write, but with validation
+      ".read": true,
       ".write": true,
-      
       "$scoreId": {
         ".validate": "newData.hasChildren(['name', 'score', 'date', 'timestamp'])",
         
         "name": {
-          // Name must be a string, 1-50 characters
           ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 50"
         },
         
         "score": {
-          // Score must be a number between 100 and 999999999
           ".validate": "newData.isNumber() && newData.val() >= 100 && newData.val() <= 999999999"
         },
         
         "date": {
-          // Date must be ISO string
-          ".validate": "newData.isString() && newData.val().length == 24"
+          ".validate": "newData.isString()"
         },
         
         "timestamp": {
-          // Timestamp must be recent (within last 1 hour)
-          ".validate": "newData.isNumber() && newData.val() > now - 3600000 && newData.val() < now + 60000"
+          ".validate": "newData.isNumber()"
         }
       }
     }
@@ -50,52 +43,53 @@
 
 ## What These Rules Do
 
-✅ **Prevents invalid scores**: Only 100-999999999 accepted
-✅ **Prevents timestamps**: Rejects timestamps disguised as scores
-✅ **Requires all fields**: Must have name, score, date, timestamp
-✅ **Validates name**: 1-50 characters only
-✅ **Recent submissions only**: Can't add scores from months ago
-✅ **Rate limiting**: Timestamps must be within 1 hour (can't flood with old data)
+✅ **Allows public reads** - Anyone can view the leaderboard
+✅ **Allows public writes** - Anyone can submit scores
+✅ **Validates score format** - Must be 100-999,999,999
+✅ **Validates name** - 1-50 characters
+✅ **Requires all fields** - name, score, date, timestamp must be present
 
-## Enable Authentication (Optional - More Secure)
+## Testing After Setup
 
-For even better security, you can require sign-in:
+After publishing the rules:
 
-```json
-{
-  "rules": {
-    "leaderboard": {
-      ".read": "auth != null",
-      ".write": "auth != null",
-      // ... rest of validation rules
-    }
-  }
-}
-```
+1. Refresh your game page (Ctrl+Shift+R)
+2. Open DevTools Console (F12)
+3. Run: `debugTestFirebaseWrite()`
+4. You should see: `✅ Write successful! Key: ...`
+5. Click "➕ Submit Score" and enter a test score
+6. Check the **Global** leaderboard tab - your score should appear!
 
-Then update `js/firebase-config.js` to require sign-in before submitting scores.
+## Optional: Add Authentication (More Secure)
 
-## Disable Public Write (Maximum Security)
-
-If you only want admins to manage the leaderboard:
+If you want only authenticated users to submit scores:
 
 ```json
 {
   "rules": {
     "leaderboard": {
       ".read": true,
-      ".write": "auth != null && root.child('admins').child(auth.uid).exists()"
+      ".write": "auth != null",
+      "$scoreId": {
+        // ... same validation rules as above
+      }
     }
   }
 }
 ```
 
-## Testing Rules
+Then update the code to require sign-in before submitting.
 
-After publishing:
-1. Open DevTools Console
-2. Try submitting invalid scores:
-   - `debugExportCrops()` - will fail validation
-   - Scores with missing fields - will fail
-   - Timestamps as scores - will fail
-3. Valid scores should still work
+## Troubleshooting
+
+**If scores still don't appear:**
+- Make sure you clicked **Publish** (not just copied)
+- Check Firebase Console > Realtime Database > Data to see if data is there
+- Run `debugFirebase()` in console to verify connection
+- Run `debugTestFirebaseWrite()` to test write permissions
+
+**If you see "PERMISSION_DENIED" error:**
+- The rules above weren't published correctly
+- Go back to Rules tab and click Publish again
+- Wait 10 seconds for rules to apply
+
