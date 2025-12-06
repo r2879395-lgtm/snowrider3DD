@@ -67,14 +67,22 @@ class Leaderboard {
         // Wait for Firebase config to load
         await this.waitForFirebase();
 
+        console.log('🔍 Firebase check:', {
+            firebaseConfig: !!window.firebaseConfig,
+            isAvailable: window.firebaseConfig?.isAvailable,
+            hasDatabase: !!window.firebaseConfig?.database
+        });
+
         if (window.firebaseConfig && window.firebaseConfig.isAvailable) {
             try {
                 this.database = window.firebaseConfig.database;
                 this.leaderboardRef = this.database.ref('leaderboard');
                 this.isOnline = true;
+                console.log('📡 Firebase reference created');
                 
                 // Listen for real-time updates
                 this.leaderboardRef.orderByChild('score').limitToLast(100).on('value', (snapshot) => {
+                    console.log('📊 Firebase snapshot received:', snapshot.numChildren(), 'entries');
                     this.onlineScores = [];
                     snapshot.forEach((child) => {
                         this.onlineScores.push({
@@ -87,21 +95,27 @@ class Leaderboard {
                     this.onlineScores.sort((a, b) => b.score - a.score);
                     this.onlineScores = this.onlineScores.slice(0, this.maxEntries);
                     
+                    console.log('🏆 Top scores:', this.onlineScores.map(s => `${s.name}: ${s.score}`).join(', '));
+                    
                     // Update display if modal is open
                     if (this.leaderboardModal.style.display === 'block') {
                         this.updateLeaderboardDisplay();
                     }
                     
                     this.updatePlayerCount();
+                }, (error) => {
+                    console.error('❌ Firebase listener error:', error);
+                    this.fallbackToLocalOnly();
                 });
 
                 this.updateConnectionStatus(true);
                 console.log('✓ Online leaderboard connected');
             } catch (error) {
-                console.error('Firebase connection error:', error);
+                console.error('❌ Firebase connection error:', error);
                 this.fallbackToLocalOnly();
             }
         } else {
+            console.log('⚠️ Firebase not available, using local only');
             this.fallbackToLocalOnly();
         }
     }
@@ -412,6 +426,29 @@ class Leaderboard {
         return div.innerHTML;
     }
 
+    // Debug: Test Firebase connection
+    testFirebase() {
+        console.log('🔍 Firebase Debug Info:');
+        console.log('  isOnline:', this.isOnline);
+        console.log('  database:', !!this.database);
+        console.log('  leaderboardRef:', !!this.leaderboardRef);
+        console.log('  onlineScores:', this.onlineScores.length, 'entries');
+        
+        if (this.isOnline && this.leaderboardRef) {
+            console.log('📝 Attempting to read leaderboard...');
+            this.leaderboardRef.once('value', (snapshot) => {
+                console.log('✅ Firebase read successful:', snapshot.numChildren(), 'entries');
+                snapshot.forEach((child) => {
+                    console.log(`   ${child.val().name}: ${child.val().score}`);
+                });
+            }).catch(error => {
+                console.error('❌ Firebase read failed:', error);
+            });
+        } else {
+            console.log('⚠️ Firebase not online or ref not available');
+        }
+    }
+
     // Manual score addition for testing
     addTestScore(name, score) {
         this.currentScore = score;
@@ -421,6 +458,7 @@ class Leaderboard {
 
 }
 
+
 // Initialize leaderboard when DOM is ready
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
@@ -429,3 +467,12 @@ if (document.readyState === 'loading') {
 } else {
     window.leaderboard = new Leaderboard();
 }
+
+// Global debug function for Firebase testing
+window.debugFirebase = function() {
+    if (window.leaderboard) {
+        window.leaderboard.testFirebase();
+    } else {
+        console.log('❌ Leaderboard not initialized');
+    }
+};
