@@ -133,6 +133,16 @@ class Leaderboard {
                     
                     // Sort by score descending
                     this.onlineScores.sort((a, b) => b.score - a.score);
+                    
+                    // Deduplicate by player name - keep only the highest score per player
+                    const playerMap = new Map();
+                    this.onlineScores.forEach(score => {
+                        const playerKey = score.name.toLowerCase();
+                        if (!playerMap.has(playerKey) || playerMap.get(playerKey).score < score.score) {
+                            playerMap.set(playerKey, score);
+                        }
+                    });
+                    this.onlineScores = Array.from(playerMap.values()).sort((a, b) => b.score - a.score);
                     this.onlineScores = this.onlineScores.slice(0, this.maxEntries);
                     
                     console.log('🏆 Top scores:', this.onlineScores.map(s => `${s.name}: ${s.score}`).join(', '));
