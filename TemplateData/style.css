@@ -174,7 +174,8 @@ body {
 
 .leaderboard-btn:hover,
 .manual-score-btn:hover,
-.scan-score-btn:hover {
+.scan-score-btn:hover,
+.remove-scores-btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
 }
@@ -193,6 +194,23 @@ body {
     cursor: pointer;
     z-index: 1000;
     box-shadow: 0 4px 15px rgba(240, 147, 251, 0.4);
+    transition: all 0.3s ease;
+}
+
+.remove-scores-btn {
+    position: fixed;
+    top: 140px;
+    right: 20px;
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    font-size: 16px;
+    font-weight: bold;
+    border-radius: 25px;
+    cursor: pointer;
+    z-index: 1000;
+    box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
     transition: all 0.3s ease;
 }
 

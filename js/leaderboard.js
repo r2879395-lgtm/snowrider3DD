@@ -35,6 +35,12 @@ class Leaderboard {
         this.closeBtn.addEventListener('click', () => this.hideLeaderboard());
         this.submitScoreBtn.addEventListener('click', () => this.submitScore());
         
+        // Remove scores button
+        const removeBtn = document.getElementById('removeScoresBtn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', () => this.showRemoveScoresDialog());
+        }
+        
         // Tab switching
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -454,6 +460,63 @@ class Leaderboard {
         this.currentScore = score;
         this.playerNameInput.value = name;
         this.submitScore();
+    }
+
+    // Remove scores with passkey protection
+    showRemoveScoresDialog() {
+        const passkey = prompt('🔐 Enter admin passkey to remove all scores:', '');
+        
+        if (passkey === null) {
+            console.log('ℹ️ Remove cancelled');
+            return;
+        }
+        
+        // Admin passkey (change this to your own secure passkey)
+        const ADMIN_PASSKEY = 'snowrider2025';
+        
+        if (passkey !== ADMIN_PASSKEY) {
+            alert('❌ Incorrect passkey! Access denied.');
+            console.log('⚠️ Invalid passkey attempt');
+            return;
+        }
+        
+        // Show confirmation dialog
+        const confirm = window.confirm('⚠️ This will DELETE ALL scores from the global leaderboard!\n\nAre you sure?');
+        
+        if (!confirm) {
+            console.log('ℹ️ Deletion cancelled');
+            return;
+        }
+        
+        this.deleteAllScores();
+    }
+
+    deleteAllScores() {
+        console.log('🗑️ Deleting all scores...');
+        
+        // Delete local scores
+        localStorage.removeItem(this.storageKey);
+        this.onlineScores = [];
+        console.log('✅ Local scores cleared');
+        
+        // Delete online scores
+        if (this.isOnline && this.leaderboardRef) {
+            this.leaderboardRef.remove()
+                .then(() => {
+                    console.log('✅ Online scores cleared from Firebase');
+                    alert('✅ All scores have been removed!');
+                    
+                    // Refresh display
+                    this.updateLeaderboardDisplay();
+                })
+                .catch(error => {
+                    console.error('❌ Failed to delete online scores:', error);
+                    alert('❌ Error deleting online scores: ' + error.message);
+                });
+        } else {
+            alert('✅ Local scores cleared (Firebase not available)');
+            this.updateLeaderboardDisplay();
+        }
     }
 
 }
