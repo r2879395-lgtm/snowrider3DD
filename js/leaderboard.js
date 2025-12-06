@@ -9,6 +9,10 @@ class Leaderboard {
         this.database = null;
         this.leaderboardRef = null;
         this.onlineScores = [];
+        
+        // Bind event handler methods
+        this.stopUnityKeys = this.stopUnityKeys.bind(this);
+        
         this.init();
     }
 
@@ -201,49 +205,83 @@ class Leaderboard {
             this.playerNameInput.value = '';
         }
         this.scoreModal.style.display = 'block';
+        this.scoreModal.classList.add('active');
 
-        // Aggressively reclaim focus from Unity canvas
-        try {
-            // Blur the Unity canvas
-            const canvas = document.querySelector('#gameContainer canvas');
-            if (canvas) {
-                canvas.blur();
-                canvas.style.pointerEvents = 'none';
-                canvas.classList.add('blur-game');
-            }
+        // Completely disable Unity canvas and game container
+        const gameContainer = document.getElementById('gameContainer');
+        const canvas = document.querySelector('#gameContainer canvas');
+        
+        if (gameContainer) {
+            gameContainer.style.pointerEvents = 'none';
+            gameContainer.style.userSelect = 'none';
+        }
+        
+        if (canvas) {
+            canvas.blur();
+            canvas.style.pointerEvents = 'none';
+            canvas.classList.add('blur-game');
+            canvas.tabIndex = -1;
+        }
+        
+        // Prevent any keyboard events from reaching Unity
+        document.addEventListener('keydown', this.stopUnityKeys, true);
+        document.addEventListener('keyup', this.stopUnityKeys, true);
+        document.addEventListener('keypress', this.stopUnityKeys, true);
+        
+        // Aggressively focus the input
+        if (this.playerNameInput) {
+            // Multiple focus attempts
+            this.playerNameInput.focus();
+            this.playerNameInput.select();
             
-            // Remove focus from active element
-            if (document.activeElement && document.activeElement.blur) {
-                document.activeElement.blur();
-            }
-            
-            // Focus the input with multiple attempts
-            if (this.playerNameInput) {
+            setTimeout(() => {
                 this.playerNameInput.focus();
-                this.playerNameInput.click();
-                setTimeout(() => {
-                    this.playerNameInput.focus();
-                }, 50);
-                setTimeout(() => {
-                    this.playerNameInput.focus();
-                }, 200);
-                setTimeout(() => {
-                    this.playerNameInput.focus();
-                }, 500);
-            }
-        } catch (e) {
-            console.log('Focus handling issue:', e);
+                this.playerNameInput.select();
+            }, 10);
+            
+            setTimeout(() => {
+                this.playerNameInput.focus();
+                this.playerNameInput.select();
+            }, 100);
+            
+            setTimeout(() => {
+                this.playerNameInput.focus();
+                this.playerNameInput.select();
+            }, 300);
+        }
+    }
+
+    stopUnityKeys(e) {
+        // Block Unity from receiving keyboard events, but allow input field
+        if (e.target.id !== 'playerName' && e.target !== this.playerNameInput) {
+            e.stopPropagation();
+            e.preventDefault();
         }
     }
 
     hideScoreModal() {
         this.scoreModal.style.display = 'none';
-        // Re-enable canvas pointer events
+        this.scoreModal.classList.remove('active');
+        
+        // Re-enable everything
+        const gameContainer = document.getElementById('gameContainer');
         const canvas = document.querySelector('#gameContainer canvas');
+        
+        if (gameContainer) {
+            gameContainer.style.pointerEvents = 'auto';
+            gameContainer.style.userSelect = 'auto';
+        }
+        
         if (canvas) {
             canvas.style.pointerEvents = 'auto';
             canvas.classList.remove('blur-game');
+            canvas.tabIndex = 0;
         }
+        
+        // Remove keyboard event blockers
+        document.removeEventListener('keydown', this.stopUnityKeys, true);
+        document.removeEventListener('keyup', this.stopUnityKeys, true);
+        document.removeEventListener('keypress', this.stopUnityKeys, true);
     }
 
     async submitScore() {
