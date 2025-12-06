@@ -181,8 +181,8 @@ body {
 
 .scan-score-btn {
     position: fixed;
-    top: 20px;
-    right: 160px;
+    top: 65px;
+    right: 20px;
     background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
     color: white;
     border: none;
