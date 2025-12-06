@@ -209,6 +209,7 @@ class Leaderboard {
             if (canvas) {
                 canvas.blur();
                 canvas.style.pointerEvents = 'none';
+                canvas.classList.add('blur-game');
             }
             
             // Remove focus from active element
@@ -218,9 +219,10 @@ class Leaderboard {
             
             // Focus the input with multiple attempts
             if (this.playerNameInput) {
+                this.playerNameInput.focus();
+                this.playerNameInput.click();
                 setTimeout(() => {
                     this.playerNameInput.focus();
-                    this.playerNameInput.click();
                 }, 50);
                 setTimeout(() => {
                     this.playerNameInput.focus();
@@ -240,6 +242,7 @@ class Leaderboard {
         const canvas = document.querySelector('#gameContainer canvas');
         if (canvas) {
             canvas.style.pointerEvents = 'auto';
+            canvas.classList.remove('blur-game');
         }
     }
 

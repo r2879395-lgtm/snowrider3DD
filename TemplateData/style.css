@@ -16,6 +16,12 @@ body {
     /*background-color: black;*/
 }
 
+#gameContainer canvas.blur-game {
+    pointer-events: none;
+    filter: blur(3px);
+    opacity: 0.5;
+}
+
 .webgl-content {
     position: absolute;
     top: 50%;
