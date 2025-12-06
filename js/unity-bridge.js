@@ -177,6 +177,38 @@ function loadTesseract() {
     });
 }
 
+// Debug: Test if we can read canvas data
+window.debugCanvasHealth = function() {
+    console.log('🔍 Canvas Health Check:');
+    
+    // Find all canvas elements
+    const allCanvases = document.querySelectorAll('canvas');
+    console.log(`   Found ${allCanvases.length} canvas elements total`);
+    
+    allCanvases.forEach((canvas, idx) => {
+        console.log(`   Canvas ${idx}: ${canvas.width}x${canvas.height}, id="${canvas.id}", class="${canvas.className}"`);
+        
+        try {
+            const ctx = canvas.getContext('2d');
+            const data = ctx.getImageData(0, 0, 1, 1);
+            console.log(`      ✓ Can read pixel data: RGBA(${data.data[0]},${data.data[1]},${data.data[2]},${data.data[3]})`);
+        } catch (e) {
+            console.log(`      ✗ CANNOT read pixel data: ${e.message}`);
+        }
+    });
+    
+    // Check gameContainer
+    const gameContainer = document.getElementById('gameContainer');
+    if (gameContainer) {
+        console.log(`   gameContainer: ${gameContainer.offsetWidth}x${gameContainer.offsetHeight}`);
+        console.log(`   gameContainer children:`, gameContainer.children.length);
+        for (let i = 0; i < gameContainer.children.length; i++) {
+            const child = gameContainer.children[i];
+            console.log(`      ${child.tagName}: ${child.offsetWidth}x${child.offsetHeight}`);
+        }
+    }
+};
+
 // Debug: Create downloadable crops for manual analysis
 window.debugExportCrops = function() {
     const canvas = document.querySelector('#gameContainer canvas');
@@ -215,6 +247,53 @@ window.debugExportCrops = function() {
             }
         }, i * 500); // Stagger downloads to avoid browser blocking
     });
+};
+
+// Debug: Export raw canvas screenshot without any processing
+window.debugExportRawCanvas = function() {
+    const canvas = document.querySelector('#gameContainer canvas');
+    if (!canvas) {
+        console.log('❌ Canvas not found');
+        return;
+    }
+    
+    console.log(`📸 Exporting raw canvas: ${canvas.width}x${canvas.height}`);
+    
+    const link = document.createElement('a');
+    link.href = canvas.toDataURL('image/png');
+    link.download = 'raw_canvas_screenshot.png';
+    link.click();
+    console.log('💾 Downloaded: raw_canvas_screenshot.png');
+};
+
+// Debug: Test OCR on just the raw canvas (no cropping, no processing)
+window.debugTestOcrRaw = async function() {
+    const canvas = document.querySelector('#gameContainer canvas');
+    if (!canvas) {
+        console.log('❌ Canvas not found');
+        return;
+    }
+    
+    if (!window.Tesseract) {
+        console.log('❌ Tesseract not loaded. Call loadTesseract() first');
+        return;
+    }
+    
+    console.log(`🧪 Testing raw canvas OCR (${canvas.width}x${canvas.height})...`);
+    
+    const dataUrl = canvas.toDataURL('image/png');
+    console.log('   Sending to Tesseract...');
+    
+    const result = await window.Tesseract.recognize(dataUrl, 'eng', {
+        tessedit_char_whitelist: '0123456789',
+    });
+    
+    const text = (result && result.data && result.data.text) ? result.data.text : '';
+    console.log(`   Raw OCR result: "${text}"`);
+    console.log(`   Confidence: ${result?.data?.confidence || 'unknown'}%`);
+    
+    const numbers = text.match(/\d+/g) || [];
+    console.log(`   Found numbers: ${numbers.join(', ')}`);
 };
 
 // Debug: Also show crop regions visually on the canvas
