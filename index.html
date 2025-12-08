@@ -33,6 +33,9 @@
     <!-- Leaderboard Button -->
     <button id="leaderboardBtn" class="leaderboard-btn">🏆 Leaderboard</button>
     
+    <!-- Chat Button -->
+    <button id="chatBtn" class="chat-btn">💬 Chat</button>
+    
     <!-- Manual Score Entry Button -->
     <button id="scanScoreBtn" class="scan-score-btn">➕ Submit Score</button>
     
@@ -87,8 +90,22 @@
         </div>
     </div>
 
+    <!-- Chat Modal -->
+    <div id="chatModal" class="modal">
+        <div class="modal-content chat-modal">
+            <span id="chatClose" class="close">&times;</span>
+            <h2>💬 Live Chat</h2>
+            <div id="chatMessages" class="chat-messages"></div>
+            <div class="chat-input-container">
+                <input type="text" id="chatInput" class="chat-input" placeholder="Type a message..." maxlength="200">
+                <button id="chatSendBtn" class="chat-send-btn">Send</button>
+            </div>
+        </div>
+    </div>
+
     <script src="js/firebase-config.js"></script>
     <script src="js/leaderboard.js"></script>
+    <script src="js/chat.js"></script>
     <script src="js/unity-bridge.js"></script>
 </body>
 

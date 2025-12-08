@@ -682,6 +682,11 @@ class Leaderboard {
         this.currentPlayerName = name;
         console.log('👤 Welcome,', name);
 
+        // Update chat system with new player name
+        if (window.chat) {
+            window.chat.updatePlayerName(name);
+        }
+
         // Update active player name in Firebase
         if (this.activePlayersRef) {
             this.activePlayersRef.child(this.playerSessionId).update({
