@@ -860,6 +860,51 @@ class Leaderboard {
         }
     }
 
+    async resetAllNames() {
+        console.log('🔁 Resetting all player names...');
+        // Clear local name for this browser
+        localStorage.removeItem('snowRider3D_playerName');
+        this.currentPlayerName = null;
+
+        const tasks = [];
+
+        if (this.isOnline && this.leaderboardRef) {
+            const leaderboardReset = this.leaderboardRef.once('value').then(snapshot => {
+                const updates = {};
+                snapshot.forEach(child => {
+                    updates[`${child.key}/name`] = 'Anonymous';
+                });
+                if (Object.keys(updates).length === 0) return;
+                return this.leaderboardRef.update(updates);
+            });
+            tasks.push(leaderboardReset);
+        }
+
+        if (this.isOnline && this.activePlayersRef) {
+            const activeReset = this.activePlayersRef.once('value').then(snapshot => {
+                const updates = {};
+                snapshot.forEach(child => {
+                    updates[`${child.key}/name`] = 'Anonymous';
+                });
+                if (Object.keys(updates).length === 0) return;
+                return this.activePlayersRef.update(updates);
+            });
+            tasks.push(activeReset);
+        }
+
+        try {
+            await Promise.all(tasks);
+            console.log('✅ All names reset to Anonymous');
+            alert('✅ All player names have been reset. Everyone will be prompted to enter a new name.');
+        } catch (err) {
+            console.error('❌ Error resetting names:', err);
+            alert('❌ Error resetting names: ' + err.message);
+        }
+
+        // Prompt this user again immediately
+        this.showWelcomeModal();
+    }
+
 }
 
 
@@ -886,4 +931,13 @@ window.resetPlayerNames = function() {
     localStorage.removeItem('snowRider3D_playerName');
     console.log('✅ Player name cleared! Reload the page to see the welcome modal again.');
     alert('✅ Player name has been reset! Reload the page to enter a new name.');
+};
+
+// Global function to reset ALL player names (Firebase + local) and re-prompt everyone
+window.resetAllNames = async function() {
+    if (window.leaderboard) {
+        await window.leaderboard.resetAllNames();
+    } else {
+        console.log('❌ Leaderboard not initialized');
+    }
 };
