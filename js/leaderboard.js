@@ -445,8 +445,18 @@ class Leaderboard {
     }
 
     stopUnityKeys(e) {
-        // Block Unity from receiving keyboard events, but allow input field
-        if (e.target.id !== 'playerName' && e.target !== this.playerNameInput) {
+        // Allow inputs inside modals; block everything else so Unity cannot capture
+        const allowedTargets = [
+            this.playerNameInput,
+            this.welcomePlayerNameInput,
+            this.welcomeStartBtn,
+            this.submitScoreBtn
+        ].filter(Boolean);
+
+        const isAllowed = allowedTargets.some(el => el === e.target) ||
+            (e.target.closest && e.target.closest('.modal'));
+
+        if (!isAllowed) {
             e.stopPropagation();
             e.preventDefault();
         }
@@ -639,6 +649,11 @@ class Leaderboard {
             
             // Keep focus on input - fight Unity's focus stealing
             this.focusInterval = setInterval(focusInput, 200);
+
+            // Block Unity from receiving keyboard events while welcome modal is open
+            document.addEventListener('keydown', this.stopUnityKeys, true);
+            document.addEventListener('keyup', this.stopUnityKeys, true);
+            document.addEventListener('keypress', this.stopUnityKeys, true);
             
             // Prevent any clicks/focus outside the input from stealing focus
             this.focusGuard = (e) => {
@@ -684,6 +699,11 @@ class Leaderboard {
             document.removeEventListener('focus', this.focusGuard, true);
             this.focusGuard = null;
         }
+
+        // Remove keyboard event blockers
+        document.removeEventListener('keydown', this.stopUnityKeys, true);
+        document.removeEventListener('keyup', this.stopUnityKeys, true);
+        document.removeEventListener('keypress', this.stopUnityKeys, true);
 
         // Re-enable Unity canvas
         const gameContainer = document.getElementById('gameContainer');
