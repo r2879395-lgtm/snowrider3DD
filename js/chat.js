@@ -53,28 +53,29 @@ class Chat {
             }
         });
         
-        // Allow keyboard events to flow through to input
-        this.floatingInput.addEventListener('keydown', (e) => {
-            e.stopPropagation(); // Prevent Unity from capturing
-        }, true);
+        // Capture keyboard events at window level BEFORE they reach document
+        // This has higher priority than document-level listeners
+        this.chatKeyHandler = (e) => {
+            if (document.activeElement === this.floatingInput || 
+                document.activeElement === this.chatInput) {
+                e.stopImmediatePropagation(); // Stop ALL other listeners
+                console.log('💬 Chat input active - allowing key:', e.key);
+            }
+        };
         
-        this.floatingInput.addEventListener('keyup', (e) => {
-            e.stopPropagation(); // Prevent Unity from capturing
-        }, true);
-        
-        this.floatingInput.addEventListener('keypress', (e) => {
-            e.stopPropagation(); // Prevent Unity from capturing
-        }, true);
+        window.addEventListener('keydown', this.chatKeyHandler, true);
+        window.addEventListener('keyup', this.chatKeyHandler, true);
+        window.addEventListener('keypress', this.chatKeyHandler, true);
         
         // Disable key blocking when chat input is focused
         this.floatingInput.addEventListener('focus', () => {
-            console.log('💬 Chat input focused - disabling Unity key blocking');
+            console.log('💬 Chat input focused');
             this.disableKeyBlocking();
         });
         
         // Re-enable key blocking when chat input loses focus
         this.floatingInput.addEventListener('blur', () => {
-            console.log('💬 Chat input blurred - re-enabling Unity key blocking');
+            console.log('💬 Chat input blurred');
             setTimeout(() => this.enableKeyBlocking(), 100);
         });
         
