@@ -53,23 +53,6 @@ class Chat {
             }
         });
         
-        // Capture keyboard events at window level to protect chat input
-        this.chatKeyHandler = (e) => {
-            // Only intercept if chat input is actually focused
-            if (document.activeElement === this.floatingInput || 
-                document.activeElement === this.chatInput) {
-                // Stop the event from reaching document-level Unity blockers
-                // but let it continue to the input element itself
-                e.stopPropagation();
-                console.log('💬 Chat input active - allowing key:', e.key);
-            }
-            // Otherwise, do nothing - let the event propagate normally for game controls
-        };
-        
-        window.addEventListener('keydown', this.chatKeyHandler, true);
-        window.addEventListener('keyup', this.chatKeyHandler, true);
-        window.addEventListener('keypress', this.chatKeyHandler, true);
-        
         // Disable key blocking when chat input is focused
         this.floatingInput.addEventListener('focus', () => {
             console.log('💬 Chat input focused');
