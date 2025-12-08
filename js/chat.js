@@ -7,6 +7,7 @@ class Chat {
         this.currentPlayerName = localStorage.getItem('snowRider3D_playerName') || 'Anonymous';
         this.maxMessages = 50;
         this.messages = [];
+        this.keyBlockingDisabled = false;
         
         this.init();
     }
@@ -52,23 +53,16 @@ class Chat {
             }
         });
         
-        // Allow ALL keyboard input when floating chat is focused
+        // Disable key blocking when chat input is focused
         this.floatingInput.addEventListener('focus', () => {
             console.log('💬 Chat input focused - disabling Unity key blocking');
-            if (window.leaderboard) {
-                document.removeEventListener('keydown', window.leaderboard.stopUnityKeys, true);
-                document.removeEventListener('keyup', window.leaderboard.stopUnityKeys, true);
-                document.removeEventListener('keypress', window.leaderboard.stopUnityKeys, true);
-            }
+            this.disableKeyBlocking();
         });
         
+        // Re-enable key blocking when chat input loses focus
         this.floatingInput.addEventListener('blur', () => {
             console.log('💬 Chat input blurred - re-enabling Unity key blocking');
-            if (window.leaderboard) {
-                document.addEventListener('keydown', window.leaderboard.stopUnityKeys, true);
-                document.addEventListener('keyup', window.leaderboard.stopUnityKeys, true);
-                document.addEventListener('keypress', window.leaderboard.stopUnityKeys, true);
-            }
+            setTimeout(() => this.enableKeyBlocking(), 100);
         });
         
         // Close modal when clicking outside
@@ -80,6 +74,28 @@ class Chat {
         
         // Initialize Firebase
         this.initializeChat();
+    }
+
+    disableKeyBlocking() {
+        if (this.keyBlockingDisabled) return;
+        this.keyBlockingDisabled = true;
+        
+        if (window.leaderboard) {
+            document.removeEventListener('keydown', window.leaderboard.stopUnityKeys, true);
+            document.removeEventListener('keyup', window.leaderboard.stopUnityKeys, true);
+            document.removeEventListener('keypress', window.leaderboard.stopUnityKeys, true);
+        }
+    }
+
+    enableKeyBlocking() {
+        if (!this.keyBlockingDisabled) return;
+        this.keyBlockingDisabled = false;
+        
+        if (window.leaderboard) {
+            document.addEventListener('keydown', window.leaderboard.stopUnityKeys, true);
+            document.addEventListener('keyup', window.leaderboard.stopUnityKeys, true);
+            document.addEventListener('keypress', window.leaderboard.stopUnityKeys, true);
+        }
     }
 
     async initializeChat() {

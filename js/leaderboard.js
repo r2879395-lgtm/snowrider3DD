@@ -445,6 +445,11 @@ class Leaderboard {
     }
 
     stopUnityKeys(e) {
+        // If chat has disabled key blocking, allow all keys
+        if (window.chat && window.chat.keyBlockingDisabled) {
+            return;
+        }
+
         // Allow inputs inside modals and floating chat; block everything else so Unity cannot capture
         const allowedTargets = [
             this.playerNameInput,
