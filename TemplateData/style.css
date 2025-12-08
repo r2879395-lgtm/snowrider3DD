@@ -468,6 +468,23 @@ body {
     color: rgba(255, 255, 255, 0.5);
 }
 
+.delete-score-btn {
+    background: rgba(255, 0, 0, 0.8);
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.2s;
+    margin-left: 10px;
+}
+
+.delete-score-btn:hover {
+    background: rgba(255, 0, 0, 1);
+    transform: scale(1.1);
+}
+
 .score {
     font-size: 20px;
     font-weight: bold;

@@ -13,7 +13,7 @@
 
 ```json
 {
-  "rules": {
+  "rules": {    
     "leaderboard": {
       ".read": true,
       ".write": true,

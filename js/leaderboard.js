@@ -561,6 +561,7 @@ class Leaderboard {
                 const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '';
                 const date = new Date(entry.date || entry.timestamp);
                 const timeAgo = this.getTimeAgo(date);
+                const entryId = entry.id || index;
                 
                 return `
                     <div class="leaderboard-entry ${rankClass}">
@@ -570,9 +571,20 @@ class Leaderboard {
                             <div class="player-time">${timeAgo}</div>
                         </div>
                         <div class="score">${entry.score.toLocaleString()}</div>
+                        <button class="delete-score-btn" data-entry-id="${entryId}" data-tab="${this.currentTab}" title="Delete this score">🗑️</button>
                     </div>
                 `;
             }).join('');
+            
+            // Add event listeners to delete buttons
+            document.querySelectorAll('.delete-score-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const entryId = btn.getAttribute('data-entry-id');
+                    const tab = btn.getAttribute('data-tab');
+                    this.deleteSingleScore(entryId, tab);
+                });
+            });
         }
     }
 
@@ -704,6 +716,46 @@ class Leaderboard {
         }
         
         this.deleteAllScores();
+    }
+
+    deleteSingleScore(entryId, tab) {
+        // Ask for confirmation
+        if (!confirm('Are you sure you want to delete this score?')) {
+            return;
+        }
+
+        // Ask for passkey
+        const passkey = prompt('Enter admin passkey to delete this score:');
+        if (passkey !== 'snowrider2025') {
+            alert('❌ Incorrect passkey!');
+            return;
+        }
+
+        console.log('🗑️ Deleting score:', entryId, 'from', tab);
+
+        if (tab === 'global') {
+            // Delete from Firebase
+            if (this.isOnline && this.leaderboardRef) {
+                this.leaderboardRef.child(entryId).remove()
+                    .then(() => {
+                        console.log('✅ Score deleted from Firebase');
+                        alert('✅ Score has been removed!');
+                        // Firebase listener will automatically update the display
+                    })
+                    .catch(error => {
+                        console.error('❌ Failed to delete score:', error);
+                        alert('❌ Error deleting score: ' + error.message);
+                    });
+            }
+        } else {
+            // Delete from local storage
+            const localScores = this.getScores();
+            localScores.splice(entryId, 1); // entryId is the index for local scores
+            this.saveScores(localScores);
+            console.log('✅ Score deleted from local storage');
+            alert('✅ Score has been removed!');
+            this.updateLeaderboardDisplay();
+        }
     }
 
     deleteAllScores() {
