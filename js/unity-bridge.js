@@ -10,9 +10,9 @@
 
 // Configuration
 const SCORE_CONFIG = {
-    minScore: 100,              // Minimum valid score
+    minScore: 1,                // Minimum valid score
     maxScore: 999999999,        // Maximum valid score
-    minScoreLength: 3,          // Minimum digits in a score
+    minScoreLength: 1,          // Minimum digits in a score
     debounceTime: 2000,         // Milliseconds to wait before submitting same score again
     domCheckInterval: 500,      // How often to check DOM for score display
     storageCheckInterval: 1000, // How often to check storage
