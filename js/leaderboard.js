@@ -850,3 +850,10 @@ window.debugFirebase = function() {
         console.log('❌ Leaderboard not initialized');
     }
 };
+
+// Global function to reset player names - forces welcome modal to show again
+window.resetPlayerNames = function() {
+    localStorage.removeItem('snowRider3D_playerName');
+    console.log('✅ Player name cleared! Reload the page to see the welcome modal again.');
+    alert('✅ Player name has been reset! Reload the page to enter a new name.');
+};
