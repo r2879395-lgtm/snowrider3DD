@@ -12,7 +12,7 @@ class Chat {
     }
 
     init() {
-        // Get DOM elements
+        // Get DOM elements for modal
         this.chatBtn = document.getElementById('chatBtn');
         this.chatModal = document.getElementById('chatModal');
         this.chatMessages = document.getElementById('chatMessages');
@@ -20,9 +20,16 @@ class Chat {
         this.chatSendBtn = document.getElementById('chatSendBtn');
         this.chatClose = document.getElementById('chatClose');
         
+        // Get DOM elements for floating popup
+        this.floatingPopup = document.getElementById('floatingChatPopup');
+        this.floatingMessages = document.getElementById('floatingChatMessages');
+        this.floatingInput = document.getElementById('floatingChatInput');
+        this.floatingSendBtn = document.getElementById('floatingChatSendBtn');
+        this.floatingToggle = document.getElementById('floatingChatToggle');
+        
         if (!this.chatBtn) return; // Chat not in HTML yet
         
-        // Bind events
+        // Modal events
         this.chatBtn.addEventListener('click', () => this.showChat());
         this.chatClose.addEventListener('click', () => this.hideChat());
         this.chatSendBtn.addEventListener('click', () => this.sendMessage());
@@ -31,6 +38,17 @@ class Chat {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 this.sendMessage();
+            }
+        });
+        
+        // Floating popup events
+        this.floatingToggle.addEventListener('click', () => this.toggleFloatingChat());
+        this.floatingSendBtn.addEventListener('click', () => this.sendMessageFloating());
+        
+        this.floatingInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                this.sendMessageFloating();
             }
         });
         
@@ -69,9 +87,12 @@ class Chat {
                     // Sort by timestamp ascending (oldest first)
                     this.messages.sort((a, b) => a.timestamp - b.timestamp);
                     
-                    // Update display if chat is open
+                    // Update both displays
                     if (this.chatModal.style.display === 'block') {
                         this.updateChatDisplay();
+                    }
+                    if (!this.floatingPopup.classList.contains('collapsed')) {
+                        this.updateFloatingChatDisplay();
                     }
                 });
             } catch (error) {
@@ -124,6 +145,21 @@ class Chat {
         }
     }
 
+    toggleFloatingChat() {
+        if (!this.floatingPopup) return;
+        
+        const isCollapsed = this.floatingPopup.classList.contains('collapsed');
+        if (isCollapsed) {
+            this.floatingPopup.classList.remove('collapsed');
+            this.floatingToggle.textContent = '−';
+            this.updateFloatingChatDisplay();
+            setTimeout(() => this.floatingInput.focus(), 100);
+        } else {
+            this.floatingPopup.classList.add('collapsed');
+            this.floatingToggle.textContent = '+';
+        }
+    }
+
     updateChatDisplay() {
         if (!this.chatMessages) return;
         
@@ -159,6 +195,41 @@ class Chat {
         this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
     }
 
+    updateFloatingChatDisplay() {
+        if (!this.floatingMessages) return;
+        
+        this.floatingMessages.innerHTML = '';
+        
+        if (this.messages.length === 0) {
+            this.floatingMessages.innerHTML = '<div class="floating-chat-empty">No messages yet</div>';
+            return;
+        }
+        
+        this.messages.forEach(msg => {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'floating-chat-message';
+            if (msg.name === this.currentPlayerName) {
+                msgDiv.classList.add('own-message');
+            }
+            
+            const timeStr = new Date(msg.timestamp).toLocaleTimeString([], { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+            
+            msgDiv.innerHTML = `
+                <div class="floating-chat-name">${this.escapeHtml(msg.name)}</div>
+                <div class="floating-chat-text">${this.escapeHtml(msg.text)}</div>
+                <div class="floating-chat-time">${timeStr}</div>
+            `;
+            
+            this.floatingMessages.appendChild(msgDiv);
+        });
+        
+        // Scroll to bottom
+        this.floatingMessages.scrollTop = this.floatingMessages.scrollHeight;
+    }
+
     async sendMessage() {
         const text = this.chatInput.value.trim();
         
@@ -185,6 +256,39 @@ class Chat {
             
             await this.chatRef.push(message);
             this.chatInput.value = '';
+            console.log('✅ Message sent');
+        } catch (error) {
+            console.error('❌ Error sending message:', error);
+            alert('❌ Failed to send message: ' + error.message);
+        }
+    }
+
+    async sendMessageFloating() {
+        const text = this.floatingInput.value.trim();
+        
+        if (!text) {
+            return;
+        }
+        
+        if (text.length > 200) {
+            alert('❌ Message too long (max 200 characters)');
+            return;
+        }
+        
+        if (!this.isOnline || !this.chatRef) {
+            alert('❌ Chat not available. Firebase connection required.');
+            return;
+        }
+        
+        try {
+            const message = {
+                name: this.currentPlayerName,
+                text: text,
+                timestamp: firebase.database.ServerValue.TIMESTAMP
+            };
+            
+            await this.chatRef.push(message);
+            this.floatingInput.value = '';
             console.log('✅ Message sent');
         } catch (error) {
             console.error('❌ Error sending message:', error);
