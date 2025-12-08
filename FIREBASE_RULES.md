@@ -53,6 +53,25 @@
           ".validate": "newData.isNumber()"
         }
       }
+    },
+    "chat": {
+      ".read": true,
+      ".write": true,
+      "$messageId": {
+        ".validate": "newData.hasChildren(['name', 'text', 'timestamp'])",
+        
+        "name": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 50"
+        },
+        
+        "text": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 200"
+        },
+        
+        "timestamp": {
+          ".validate": "newData.isNumber()"
+        }
+      }
     }
   }
 }
@@ -60,11 +79,12 @@
 
 ## What These Rules Do
 
-✅ **Allows public reads** - Anyone can view the leaderboard
-✅ **Allows public writes** - Anyone can submit scores
+✅ **Allows public reads** - Anyone can view the leaderboard and chat
+✅ **Allows public writes** - Anyone can submit scores and chat messages
 ✅ **Validates score format** - Must be 100-999,999,999
+✅ **Validates chat messages** - 1-200 characters, requires name, text, and timestamp
 ✅ **Validates name** - 1-50 characters
-✅ **Requires all fields** - name, score, date, timestamp must be present
+✅ **Requires all fields** - name, score, date, timestamp must be present for leaderboard
 ✅ **Allows active player tracking** - sessionId, timestamp fields for `/activePlayers` node
 
 ## Testing After Setup
