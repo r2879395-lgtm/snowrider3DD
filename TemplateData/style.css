@@ -245,6 +245,8 @@ body {
     border-radius: 20px;
     width: 90%;
     max-width: 500px;
+    max-height: 85vh;
+    overflow-y: auto;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
     color: white;
     animation: slideDown 0.3s ease;
