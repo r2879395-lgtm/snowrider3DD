@@ -445,16 +445,18 @@ class Leaderboard {
     }
 
     stopUnityKeys(e) {
-        // Allow inputs inside modals; block everything else so Unity cannot capture
+        // Allow inputs inside modals and floating chat; block everything else so Unity cannot capture
         const allowedTargets = [
             this.playerNameInput,
             this.welcomePlayerNameInput,
             this.welcomeStartBtn,
-            this.submitScoreBtn
+            this.submitScoreBtn,
+            document.getElementById('floatingChatInput'),
+            document.getElementById('floatingChatSendBtn')
         ].filter(Boolean);
 
         const isAllowed = allowedTargets.some(el => el === e.target) ||
-            (e.target.closest && e.target.closest('.modal'));
+            (e.target.closest && (e.target.closest('.modal') || e.target.closest('.floating-chat-popup')));
 
         if (!isAllowed) {
             e.stopPropagation();
