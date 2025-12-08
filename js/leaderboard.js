@@ -605,22 +605,49 @@ class Leaderboard {
     showWelcomeModal() {
         if (this.welcomeModal) {
             this.welcomeModal.style.display = 'block';
+            this.welcomeModal.classList.add('active');
             
-            // Blur Unity canvas to prevent it from capturing keyboard input
+            // Completely disable Unity canvas interactions
+            const gameContainer = document.getElementById('gameContainer');
             const unityCanvas = document.querySelector('#gameContainer canvas');
+            if (gameContainer) {
+                gameContainer.style.pointerEvents = 'none';
+            }
             if (unityCanvas) {
                 unityCanvas.blur();
                 unityCanvas.style.pointerEvents = 'none';
+                unityCanvas.tabIndex = -1;
             }
             
-            // Focus the input after a short delay
-            if (this.welcomePlayerNameInput) {
-                setTimeout(() => {
+            // Aggressive focus management
+            const focusInput = () => {
+                if (this.welcomePlayerNameInput && this.welcomeModal.style.display === 'block') {
                     this.welcomePlayerNameInput.focus();
-                    // Ensure input can receive keyboard events
-                    this.welcomePlayerNameInput.click();
-                }, 200);
-            }
+                    this.welcomePlayerNameInput.select();
+                }
+            };
+            
+            // Focus immediately and repeatedly to fight Unity
+            focusInput();
+            setTimeout(focusInput, 100);
+            setTimeout(focusInput, 300);
+            setTimeout(focusInput, 500);
+            
+            // Keep focus on input - fight Unity's focus stealing
+            this.focusInterval = setInterval(focusInput, 200);
+            
+            // Prevent any clicks/focus outside the input from stealing focus
+            this.focusGuard = (e) => {
+                if (this.welcomeModal.style.display === 'block' && 
+                    e.target !== this.welcomePlayerNameInput && 
+                    e.target !== this.welcomeStartBtn) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    focusInput();
+                }
+            };
+            document.addEventListener('mousedown', this.focusGuard, true);
+            document.addEventListener('focus', this.focusGuard, true);
         }
     }
 
@@ -643,14 +670,31 @@ class Leaderboard {
             }).catch(err => console.log('Error updating player name:', err));
         }
 
+        // Clean up focus management
+        if (this.focusInterval) {
+            clearInterval(this.focusInterval);
+            this.focusInterval = null;
+        }
+        if (this.focusGuard) {
+            document.removeEventListener('mousedown', this.focusGuard, true);
+            document.removeEventListener('focus', this.focusGuard, true);
+            this.focusGuard = null;
+        }
+
         // Re-enable Unity canvas
+        const gameContainer = document.getElementById('gameContainer');
         const unityCanvas = document.querySelector('#gameContainer canvas');
+        if (gameContainer) {
+            gameContainer.style.pointerEvents = 'auto';
+        }
         if (unityCanvas) {
             unityCanvas.style.pointerEvents = 'auto';
+            unityCanvas.tabIndex = 0;
         }
 
         // Hide welcome modal
         this.welcomeModal.style.display = 'none';
+        this.welcomeModal.classList.remove('active');
     }
 
     escapeHtml(text) {

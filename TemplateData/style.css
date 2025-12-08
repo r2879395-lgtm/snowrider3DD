@@ -234,6 +234,15 @@ body {
     pointer-events: none !important;
 }
 
+#welcomeModal {
+    z-index: 99999 !important;
+}
+
+#welcomeModal.active ~ .webgl-content,
+#welcomeModal.active ~ .webgl-content * {
+    pointer-events: none !important;
+}
+
 .modal.active ~ .webgl-content * {
     pointer-events: none !important;
 }
