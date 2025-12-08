@@ -53,6 +53,19 @@ class Chat {
             }
         });
         
+        // Allow keyboard events to flow through to input
+        this.floatingInput.addEventListener('keydown', (e) => {
+            e.stopPropagation(); // Prevent Unity from capturing
+        }, true);
+        
+        this.floatingInput.addEventListener('keyup', (e) => {
+            e.stopPropagation(); // Prevent Unity from capturing
+        }, true);
+        
+        this.floatingInput.addEventListener('keypress', (e) => {
+            e.stopPropagation(); // Prevent Unity from capturing
+        }, true);
+        
         // Disable key blocking when chat input is focused
         this.floatingInput.addEventListener('focus', () => {
             console.log('💬 Chat input focused - disabling Unity key blocking');
