@@ -52,6 +52,25 @@ class Chat {
             }
         });
         
+        // Allow ALL keyboard input when floating chat is focused
+        this.floatingInput.addEventListener('focus', () => {
+            console.log('💬 Chat input focused - disabling Unity key blocking');
+            if (window.leaderboard) {
+                document.removeEventListener('keydown', window.leaderboard.stopUnityKeys, true);
+                document.removeEventListener('keyup', window.leaderboard.stopUnityKeys, true);
+                document.removeEventListener('keypress', window.leaderboard.stopUnityKeys, true);
+            }
+        });
+        
+        this.floatingInput.addEventListener('blur', () => {
+            console.log('💬 Chat input blurred - re-enabling Unity key blocking');
+            if (window.leaderboard) {
+                document.addEventListener('keydown', window.leaderboard.stopUnityKeys, true);
+                document.addEventListener('keyup', window.leaderboard.stopUnityKeys, true);
+                document.addEventListener('keypress', window.leaderboard.stopUnityKeys, true);
+            }
+        });
+        
         // Close modal when clicking outside
         window.addEventListener('click', (e) => {
             if (e.target === this.chatModal) {
