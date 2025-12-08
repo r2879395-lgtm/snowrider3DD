@@ -12,7 +12,13 @@
     <script src="TemplateData/UnityProgress.js"></script>
     <script src="Build/UnityLoader.js"></script>
     <script>
-        var gameInstance = UnityLoader.instantiate("gameContainer", "Build/SnowRider3D-gd-1.json", { onProgress: UnityProgress, Module: { onRuntimeInitialized: function () { UnityProgress(gameInstance, "complete") } } });
+        // Don't load Unity immediately - wait for player name
+        var gameInstance = null;
+        window.initUnity = function() {
+            if (!gameInstance) {
+                gameInstance = UnityLoader.instantiate("gameContainer", "Build/SnowRider3D-gd-1.json", { onProgress: UnityProgress, Module: { onRuntimeInitialized: function () { UnityProgress(gameInstance, "complete") } } });
+            }
+        };
     </script>
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>

@@ -45,6 +45,10 @@ class Leaderboard {
             this.showWelcomeModal();
         } else {
             console.log('👤 Welcome back,', this.currentPlayerName);
+                    // Player already has a name, start Unity immediately
+                    if (window.initUnity) {
+                        setTimeout(() => window.initUnity(), 100);
+                    }
         }
 
         // Initialize Firebase/Online database
@@ -695,6 +699,12 @@ class Leaderboard {
         // Hide welcome modal
         this.welcomeModal.style.display = 'none';
         this.welcomeModal.classList.remove('active');
+
+            // Now that player has entered their name, start Unity
+            console.log('🎮 Starting Unity...');
+            if (window.initUnity) {
+                window.initUnity();
+            }
     }
 
     escapeHtml(text) {
