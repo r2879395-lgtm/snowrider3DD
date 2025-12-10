@@ -17,24 +17,13 @@
     "leaderboard": {
       ".read": true,
       ".write": true,
-      "$scoreId": {
-        ".validate": "newData.hasChildren(['name', 'score', 'date', 'timestamp'])",
-        
-        "name": {
-          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 50"
-        },
-        
-        "score": {
-          ".validate": "newData.isNumber() && newData.val() >= 100 && newData.val() <= 999999999"
-        },
-        
-        "date": {
-          ".validate": "newData.isString()"
-        },
-        
-        "timestamp": {
-          ".validate": "newData.isNumber()"
-        }
+      ".indexOn": ["score"],
+      "$playerName": {
+        ".validate": "newData.hasChildren(['score','name','date','timestamp'])",
+        "score": {".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 999999999"},
+        "name": {".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 40"},
+        "date": {".validate": "newData.isString()"},
+        "timestamp": {".validate": "newData.isNumber()"}
       }
     },
     "activePlayers": {

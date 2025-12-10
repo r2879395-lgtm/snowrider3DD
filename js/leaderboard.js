@@ -382,15 +382,13 @@ class Leaderboard {
         
         if (qualifiesLocal || qualifiesOnline) {
             const storedName = this.currentPlayerName || localStorage.getItem('snowRider3D_playerName');
-            let playerName = (storedName && storedName.trim()) ? storedName.trim() : '';
+            const playerName = (storedName && storedName.trim()) ? storedName.trim() : '';
 
-            // Fallback prompt only if no stored name exists
+            // No name means welcome was not completed; require it before saving
             if (!playerName) {
-                const promptName = prompt(`🎉 New High Score: ${score.toLocaleString()}!\n\nEnter your name for the leaderboard:`, 'Player');
-                if (promptName === null) {
-                    return; // User cancelled
-                }
-                playerName = promptName.trim() || 'Anonymous';
+                alert('Please enter your name on the welcome screen before submitting scores.');
+                this.showWelcomeModal();
+                return;
             }
 
             // Persist the chosen name so future submissions stay in sync
@@ -536,7 +534,13 @@ class Leaderboard {
 
     async submitScore() {
         const storedName = this.currentPlayerName || localStorage.getItem('snowRider3D_playerName');
-        let playerName = (storedName && storedName.trim()) ? storedName.trim() : 'Anonymous';
+        let playerName = (storedName && storedName.trim()) ? storedName.trim() : '';
+
+        if (!playerName) {
+            alert('Please enter your name on the welcome screen before submitting scores.');
+            this.showWelcomeModal();
+            return;
+        }
 
         // Ensure the visible input mirrors the stored name
         if (this.playerNameInput && this.playerNameInput.value.trim() !== playerName) {
