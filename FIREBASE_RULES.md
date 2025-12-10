@@ -81,13 +81,14 @@
 
 ✅ **Allows public reads** - Anyone can view the leaderboard and chat
 ✅ **Allows public writes** - Anyone can submit scores and chat messages
-✅ **Validates score format** - Must be 100-999,999,999
-✅ **Validates chat messages** - 1-200 characters, requires name, text, and timestamp
-✅ **Validates name** - 1-50 characters
-✅ **Requires all fields** - name, score, date, timestamp must be present for leaderboard
-✅ **Allows active player tracking** - sessionId, timestamp fields for `/activePlayers` node
-
-## Testing After Setup
+      ".indexOn": ["score"],
+      "$playerName": {
+        ".validate": "newData.hasChildren(['score','name','date','timestamp'])",
+        "score": {".validate": "newData.isNumber() && newData.val() >= 0"},
+        "name": {".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 40"},
+        "date": {".validate": "newData.isString()"},
+        "timestamp": {".validate": "newData.isNumber()"}
+      }
 
 After publishing the rules:
 

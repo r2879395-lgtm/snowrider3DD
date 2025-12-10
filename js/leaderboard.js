@@ -40,6 +40,13 @@ class Leaderboard {
         this.welcomeStartBtn = document.getElementById('welcomeStartBtn');
         this.currentPlayerName = localStorage.getItem('snowRider3D_playerName') || null;
 
+        // Lock the leaderboard name to the stored name (set at welcome)
+        if (this.playerNameInput && this.currentPlayerName) {
+            this.playerNameInput.value = this.currentPlayerName;
+            this.playerNameInput.readOnly = true;
+            this.playerNameInput.title = 'Name locked to welcome name';
+        }
+
         // Show welcome modal if no saved name
         if (!this.currentPlayerName) {
             this.showWelcomeModal();
@@ -348,6 +355,19 @@ class Leaderboard {
         return stored ? JSON.parse(stored) : [];
     }
 
+    hasExistingScore(name) {
+        const target = (name || '').toLowerCase();
+        if (!target) return false;
+
+        // Check local stored scores
+        const localHit = this.getScores().some(entry => (entry.name || '').toLowerCase() === target);
+        if (localHit) return true;
+
+        // Check online scores already loaded
+        const onlineHit = (this.onlineScores || []).some(entry => (entry.name || '').toLowerCase() === target);
+        return onlineHit;
+    }
+
     saveScores(scores) {
         localStorage.setItem(this.storageKey, JSON.stringify(scores));
     }
@@ -380,6 +400,12 @@ class Leaderboard {
                 window.chat.updatePlayerName(playerName);
             }
 
+            // Prevent multiple scores per player
+            if (this.hasExistingScore(playerName)) {
+                alert('You have already submitted a score. Only one score per player.');
+                return;
+            }
+
             const scoreEntry = {
                 name: playerName,
                 score: score,
@@ -395,7 +421,9 @@ class Leaderboard {
 
             // Save to online database if available
             if (this.isOnline && this.leaderboardRef) {
-                this.leaderboardRef.push(scoreEntry).catch(error => {
+                // Write score keyed by name to avoid duplicates server-side
+                const safeKey = playerName.toLowerCase();
+                this.leaderboardRef.child(safeKey).set(scoreEntry).catch(error => {
                     console.error('Failed to save score online:', error);
                 });
             }
@@ -411,6 +439,8 @@ class Leaderboard {
         if (this.playerNameInput) {
             const storedName = this.currentPlayerName || localStorage.getItem('snowRider3D_playerName') || '';
             this.playerNameInput.value = storedName;
+            this.playerNameInput.readOnly = true;
+            this.playerNameInput.title = 'Name locked to welcome name';
         }
         this.scoreModal.style.display = 'block';
         this.scoreModal.classList.add('active');
@@ -511,6 +541,12 @@ class Leaderboard {
         // Ensure the visible input mirrors the stored name
         if (this.playerNameInput && this.playerNameInput.value.trim() !== playerName) {
             this.playerNameInput.value = playerName;
+        }
+
+        // Prevent multiple scores per player
+        if (this.hasExistingScore(playerName)) {
+            alert('You have already submitted a score. Only one score per player.');
+            return;
         }
         
         // Store player name for active player tracking
@@ -697,6 +733,12 @@ class Leaderboard {
         localStorage.setItem('snowRider3D_playerName', name);
         this.currentPlayerName = name;
         console.log('👤 Welcome,', name);
+
+        // Lock the score input to this name for all future submissions
+        if (this.playerNameInput) {
+            this.playerNameInput.value = name;
+            this.playerNameInput.readOnly = true;
+        }
 
         // Update chat system with new player name
         if (window.chat) {
