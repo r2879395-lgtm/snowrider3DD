@@ -361,41 +361,56 @@ class Leaderboard {
         const qualifiesOnline = this.isOnline && (this.onlineScores.length < this.maxEntries || score > this.onlineScores[this.onlineScores.length - 1].score);
         
         if (qualifiesLocal || qualifiesOnline) {
-            // Use browser prompt instead of modal to bypass Unity keyboard capture
-            const playerName = prompt(`🎉 New High Score: ${score.toLocaleString()}!\n\nEnter your name for the leaderboard:`, 'Player');
-            
-            if (playerName !== null) { // User didn't click cancel
-                const scoreEntry = {
-                    name: playerName.trim() || 'Anonymous',
-                    score: score,
-                    date: new Date().toISOString(),
-                    timestamp: Date.now()
-                };
+            const storedName = this.currentPlayerName || localStorage.getItem('snowRider3D_playerName');
+            let playerName = (storedName && storedName.trim()) ? storedName.trim() : '';
 
-                // Save to local storage
-                localScores.push(scoreEntry);
-                localScores.sort((a, b) => b.score - a.score);
-                const topLocalScores = localScores.slice(0, this.maxEntries);
-                this.saveScores(topLocalScores);
-
-                // Save to online database if available
-                if (this.isOnline && this.leaderboardRef) {
-                    this.leaderboardRef.push(scoreEntry).catch(error => {
-                        console.error('Failed to save score online:', error);
-                    });
+            // Fallback prompt only if no stored name exists
+            if (!playerName) {
+                const promptName = prompt(`🎉 New High Score: ${score.toLocaleString()}!\n\nEnter your name for the leaderboard:`, 'Player');
+                if (promptName === null) {
+                    return; // User cancelled
                 }
-
-                // Show leaderboard
-                this.setTab(this.isOnline ? 'global' : 'local');
-                this.leaderboardModal.style.display = 'block';
+                playerName = promptName.trim() || 'Anonymous';
             }
+
+            // Persist the chosen name so future submissions stay in sync
+            localStorage.setItem('snowRider3D_playerName', playerName);
+            this.currentPlayerName = playerName;
+            if (window.chat) {
+                window.chat.updatePlayerName(playerName);
+            }
+
+            const scoreEntry = {
+                name: playerName,
+                score: score,
+                date: new Date().toISOString(),
+                timestamp: Date.now()
+            };
+
+            // Save to local storage
+            localScores.push(scoreEntry);
+            localScores.sort((a, b) => b.score - a.score);
+            const topLocalScores = localScores.slice(0, this.maxEntries);
+            this.saveScores(topLocalScores);
+
+            // Save to online database if available
+            if (this.isOnline && this.leaderboardRef) {
+                this.leaderboardRef.push(scoreEntry).catch(error => {
+                    console.error('Failed to save score online:', error);
+                });
+            }
+
+            // Show leaderboard
+            this.setTab(this.isOnline ? 'global' : 'local');
+            this.leaderboardModal.style.display = 'block';
         }
     }
 
     showScoreModal(score) {
         document.getElementById('currentScore').textContent = score.toLocaleString();
         if (this.playerNameInput) {
-            this.playerNameInput.value = '';
+            const storedName = this.currentPlayerName || localStorage.getItem('snowRider3D_playerName') || '';
+            this.playerNameInput.value = storedName;
         }
         this.scoreModal.style.display = 'block';
         this.scoreModal.classList.add('active');
@@ -490,13 +505,12 @@ class Leaderboard {
     }
 
     async submitScore() {
-        let playerName = 'Anonymous';
-        if (this.playerNameInput) {
-            playerName = this.playerNameInput.value.trim() || 'Anonymous';
-        } else {
-            // Fallback prompt if input is unavailable
-            const promptName = (typeof prompt === 'function') ? prompt('Enter your name for the leaderboard:', '') : '';
-            playerName = (promptName && promptName.trim()) ? promptName.trim() : 'Anonymous';
+        const storedName = this.currentPlayerName || localStorage.getItem('snowRider3D_playerName');
+        let playerName = (storedName && storedName.trim()) ? storedName.trim() : 'Anonymous';
+
+        // Ensure the visible input mirrors the stored name
+        if (this.playerNameInput && this.playerNameInput.value.trim() !== playerName) {
+            this.playerNameInput.value = playerName;
         }
         
         // Store player name for active player tracking

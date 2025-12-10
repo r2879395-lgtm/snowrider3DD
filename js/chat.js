@@ -242,6 +242,12 @@ class Chat {
             return;
         }
         
+        // Check for spam
+        if (this.isSpam(text)) {
+            alert('❌ Message contains spam or is not allowed');
+            return;
+        }
+        
         if (!this.isOnline || !this.chatRef) {
             alert('❌ Chat not available. Firebase connection required.');
             return;
@@ -275,6 +281,12 @@ class Chat {
             return;
         }
         
+        // Check for spam
+        if (this.isSpam(text)) {
+            alert('❌ Message contains spam or is not allowed');
+            return;
+        }
+        
         if (!this.isOnline || !this.chatRef) {
             alert('❌ Chat not available. Firebase connection required.');
             return;
@@ -294,6 +306,53 @@ class Chat {
             console.error('❌ Error sending message:', error);
             alert('❌ Failed to send message: ' + error.message);
         }
+    }
+
+    isSpam(text) {
+        // Convert to lowercase for checking
+        const lowerText = text.toLowerCase();
+        
+        // Check for repeated characters (more than 3 of the same char in a row)
+        if (/(.)\1{3,}/g.test(lowerText)) {
+            console.log('❌ Spam detected: Repeated characters');
+            return true;
+        }
+        
+        // Check for excessive all caps (more than 80% uppercase)
+        const uppercaseCount = (text.match(/[A-Z]/g) || []).length;
+        if (text.length > 5 && (uppercaseCount / text.length) > 0.8) {
+            console.log('❌ Spam detected: Excessive caps');
+            return true;
+        }
+        
+        // Check for common spam words/phrases
+        const spamKeywords = [
+            'viagra', 'casino', 'lottery', 'prize', 'click here', 
+            'buy now', 'free money', 'make money fast', 'work from home',
+            'xxx', 'porn', 'adult content', 'dating site'
+        ];
+        
+        for (let keyword of spamKeywords) {
+            if (lowerText.includes(keyword)) {
+                console.log('❌ Spam detected: Banned keyword -', keyword);
+                return true;
+            }
+        }
+        
+        // Check for URLs (simple check)
+        if (/https?:\/\/|www\./g.test(lowerText)) {
+            console.log('❌ Spam detected: URL');
+            return true;
+        }
+        
+        // Check for too many special characters
+        const specialCharCount = (text.match(/[!@#$%^&*]/g) || []).length;
+        if (specialCharCount > (text.length * 0.3)) {
+            console.log('❌ Spam detected: Too many special characters');
+            return true;
+        }
+        
+        return false;
     }
 
     escapeHtml(text) {
