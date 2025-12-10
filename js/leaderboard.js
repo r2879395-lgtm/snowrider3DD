@@ -30,7 +30,7 @@ class Leaderboard {
         this.scoreModal = document.getElementById('scoreModal');
         this.closeBtn = document.querySelector('.close');
         this.submitScoreBtn = document.getElementById('submitScore');
-        this.playerNameInput = document.getElementById('playerName');
+        this.playerNameDisplay = document.getElementById('playerNameDisplay');
         this.connectionStatus = document.getElementById('connectionStatus');
         this.playerCount = document.getElementById('playerCount');
         this.activeBadge = document.getElementById('activePlayers');
@@ -39,13 +39,6 @@ class Leaderboard {
         this.welcomePlayerNameInput = document.getElementById('welcomePlayerName');
         this.welcomeStartBtn = document.getElementById('welcomeStartBtn');
         this.currentPlayerName = localStorage.getItem('snowRider3D_playerName') || null;
-
-        // Lock the leaderboard name to the stored name (set at welcome)
-        if (this.playerNameInput && this.currentPlayerName) {
-            this.playerNameInput.value = this.currentPlayerName;
-            this.playerNameInput.readOnly = true;
-            this.playerNameInput.title = 'Name locked to welcome name';
-        }
 
         // Show welcome modal if no saved name
         if (!this.currentPlayerName) {
@@ -90,12 +83,7 @@ class Leaderboard {
             // Don't allow closing welcome modal by clicking outside
         });
 
-        // Enter key to submit score
-        this.playerNameInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                this.submitScore();
-            }
-        });
+
 
         // Enter key in welcome modal
         if (this.welcomePlayerNameInput) {
@@ -434,11 +422,9 @@ class Leaderboard {
 
     showScoreModal(score) {
         document.getElementById('currentScore').textContent = score.toLocaleString();
-        if (this.playerNameInput) {
-            const storedName = this.currentPlayerName || localStorage.getItem('snowRider3D_playerName') || '';
-            this.playerNameInput.value = storedName;
-            this.playerNameInput.readOnly = true;
-            this.playerNameInput.title = 'Name locked to welcome name';
+        const storedName = this.currentPlayerName || localStorage.getItem('snowRider3D_playerName') || 'Player';
+        if (this.playerNameDisplay) {
+            this.playerNameDisplay.textContent = storedName;
         }
         this.scoreModal.style.display = 'block';
         this.scoreModal.classList.add('active');
@@ -490,7 +476,6 @@ class Leaderboard {
     stopUnityKeys(e) {
         // Allow inputs inside modals and floating chat; block everything else so Unity cannot capture
         const allowedTargets = [
-            this.playerNameInput,
             this.welcomePlayerNameInput,
             this.welcomeStartBtn,
             this.submitScoreBtn,
@@ -540,11 +525,6 @@ class Leaderboard {
             alert('Please enter your name on the welcome screen before submitting scores.');
             this.showWelcomeModal();
             return;
-        }
-
-        // Ensure the visible input mirrors the stored name
-        if (this.playerNameInput && this.playerNameInput.value.trim() !== playerName) {
-            this.playerNameInput.value = playerName;
         }
 
         // Prevent multiple scores per player
@@ -737,12 +717,6 @@ class Leaderboard {
         localStorage.setItem('snowRider3D_playerName', name);
         this.currentPlayerName = name;
         console.log('👤 Welcome,', name);
-
-        // Lock the score input to this name for all future submissions
-        if (this.playerNameInput) {
-            this.playerNameInput.value = name;
-            this.playerNameInput.readOnly = true;
-        }
 
         // Update chat system with new player name
         if (window.chat) {
