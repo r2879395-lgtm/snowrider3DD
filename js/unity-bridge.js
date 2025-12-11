@@ -23,6 +23,8 @@ const SCORE_CONFIG = {
 // State tracking
 let lastDetectedScore = 0;
 let lastScoreTime = 0;
+let lastModalShownScore = 0;
+let lastModalShownTime = 0;
 let gameStartTime = Date.now();
 let knownTimestamps = new Set();
 let ocrReady = false;
@@ -44,10 +46,20 @@ window.receiveScore = function(score) {
         return;
     }
     
+    // Debounce: don't show modal for same score within 10 seconds
+    const now = Date.now();
+    if (numScore === lastModalShownScore && (now - lastModalShownTime) < 10000) {
+        console.log('⏭️ Score modal already shown for', numScore, '- debounced in receiveScore');
+        return;
+    }
+    
+    lastModalShownScore = numScore;
+    lastModalShownTime = now;
+    
     // Store latest detected score
     window.latestDetectedScore = numScore;
     lastDetectedScore = numScore;
-    lastScoreTime = Date.now();
+    lastScoreTime = now;
     
     console.log('✅ Auto-detected score:', numScore);
     
@@ -85,15 +97,22 @@ function submitScoreToLeaderboard(score) {
     }
     
     // Check if this is a duplicate recent submission
-    const timeSinceLastScore = Date.now() - lastScoreTime;
+    const now = Date.now();
+    const timeSinceLastScore = now - lastScoreTime;
     if (numScore === lastDetectedScore && timeSinceLastScore < SCORE_CONFIG.debounceTime) {
         console.log(`⏭️ Skipping duplicate score: ${numScore} (submitted ${timeSinceLastScore}ms ago)`);
         return false;
     }
     
+    // Also check against modal-shown debounce
+    if (numScore === lastModalShownScore && (now - lastModalShownTime) < 10000) {
+        console.log(`⏭️ Score modal already shown for ${numScore} - debounced in submitScoreToLeaderboard`);
+        return false;
+    }
+    
     console.log(`🎯 Valid score detected: ${numScore}`);
     lastDetectedScore = numScore;
-    lastScoreTime = Date.now();
+    lastScoreTime = now;
     
     // Trigger score modal with detected score
     if (window.receiveScore) {
