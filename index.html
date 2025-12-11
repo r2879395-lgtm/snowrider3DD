@@ -21,6 +21,16 @@
             }
             originalConsoleError.apply(console, arguments);
         };
+
+        // Suppress Unity alert popups mentioning getParameter
+        var originalAlert = window.alert;
+        window.alert = function(msg) {
+            if (typeof msg === 'string' && msg.includes('getParameter')) {
+                console.warn('Suppressed Unity getParameter alert');
+                return;
+            }
+            return originalAlert.call(window, msg);
+        };
         
         // METHOD A: Intercept Unity SendMessage BEFORE Unity loads
         (function() {
