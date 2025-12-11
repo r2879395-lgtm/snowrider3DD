@@ -31,6 +31,11 @@
             }
             return originalAlert.call(window, msg);
         };
+
+        // Ensure UnityLoader exists before we call it
+        if (typeof UnityLoader === 'undefined') {
+            document.write('<p style="color:white;">UnityLoader failed to load. Please refresh.</p>');
+        }
         
         // METHOD A: Intercept Unity SendMessage BEFORE Unity loads
         (function() {
