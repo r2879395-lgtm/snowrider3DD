@@ -821,29 +821,30 @@ function wireScanButton() {
             }
         }
         
-        // Get player name
-        const playerName = prompt('👤 Enter your name for the leaderboard:', 'Player');
-        if (playerName === null) {
-            console.log('ℹ️ Name entry cancelled');
-            return;
-        }
+        // Get stored player name from welcome screen
+        const storedName = localStorage.getItem('snowRider3D_playerName');
+        const playerName = (storedName && storedName.trim()) ? storedName.trim() : '';
         
-        if (!playerName.trim()) {
-            alert('❌ Please enter a valid name (1-50 characters)');
-            return;
-        }
-        
-        if (playerName.length > 50) {
-            alert('❌ Name too long. Maximum 50 characters.');
+        if (!playerName) {
+            alert('❌ Please enter your name on the welcome screen before submitting scores.');
+            if (window.leaderboard && window.leaderboard.showWelcomeModal) {
+                window.leaderboard.showWelcomeModal();
+            }
             return;
         }
         
         console.log(`✅ Submitting manual score: ${score} by ${playerName}`);
         
+        // Check for duplicate submission
+        if (window.leaderboard && window.leaderboard.hasExistingScore && window.leaderboard.hasExistingScore(playerName)) {
+            alert('❌ You have already submitted a score. Only one score per player.');
+            return;
+        }
+        
         // Directly submit to leaderboard without going through checkAndAddScore
         if (window.leaderboard) {
             const scoreEntry = {
-                name: playerName.trim() || 'Anonymous',
+                name: playerName,
                 score: score,
                 date: new Date().toISOString(),
                 timestamp: Date.now()
