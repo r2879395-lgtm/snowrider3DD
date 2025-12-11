@@ -4,6 +4,9 @@ class Leaderboard {
         this.storageKey = 'snowRider3D_leaderboard';
         this.maxEntries = 10;
         this.currentScore = 0;
+        this.lastShownScore = null;
+        this.scoreModalDebounceTime = 5000; // 5 second debounce
+        this.lastScoreModalTime = 0;
         this.currentTab = 'global';
         this.isOnline = false;
         this.database = null;
@@ -58,6 +61,18 @@ class Leaderboard {
         this.leaderboardBtn.addEventListener('click', () => this.showLeaderboard());
         this.closeBtn.addEventListener('click', () => this.hideLeaderboard());
         this.submitScoreBtn.addEventListener('click', () => this.submitScore());
+        
+        // Add dismiss button handler for score modal
+        const dismissScoreBtn = document.getElementById('dismissScore');
+        if (dismissScoreBtn) {
+            dismissScoreBtn.addEventListener('click', () => this.hideScoreModal());
+        }
+        
+        // Add close button handler for score modal
+        const scoreModalClose = document.getElementById('scoreModalClose');
+        if (scoreModalClose) {
+            scoreModalClose.addEventListener('click', () => this.hideScoreModal());
+        }
         
         // Remove scores button
         const removeBtn = document.getElementById('removeScoresBtn');
@@ -421,6 +436,17 @@ class Leaderboard {
     }
 
     showScoreModal(score) {
+        // Debounce repeated score modal prompts for the same score
+        const now = Date.now();
+        if (this.lastShownScore === score && (now - this.lastScoreModalTime) < this.scoreModalDebounceTime) {
+            console.log('↩️ Score modal already shown for', score, '- debounced');
+            return;
+        }
+        
+        this.lastShownScore = score;
+        this.lastScoreModalTime = now;
+        this.currentScore = score;
+        
         document.getElementById('currentScore').textContent = score.toLocaleString();
         const storedName = this.currentPlayerName || localStorage.getItem('snowRider3D_playerName') || 'Player';
         if (this.playerNameDisplay) {

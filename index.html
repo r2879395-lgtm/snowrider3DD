@@ -165,10 +165,14 @@
     <!-- Score Submit Modal -->
     <div id="scoreModal" class="modal">
         <div class="modal-content">
+            <span class="close" id="scoreModalClose">&times;</span>
             <h2>🎉 New High Score!</h2>
             <p>Your score: <span id="currentScore"></span></p>
             <p style="margin: 15px 0;">Submitting as: <strong id="playerNameDisplay"></strong></p>
-            <button id="submitScore" class="submit-btn">Submit Score</button>
+            <div style="display: flex; gap: 10px;">
+                <button id="submitScore" class="submit-btn" style="flex: 1;">Submit Score</button>
+                <button id="dismissScore" class="submit-btn" style="flex: 1; background: linear-gradient(135deg, #888 0%, #666 100%);">Skip</button>
+            </div>
         </div>
     </div>
 
