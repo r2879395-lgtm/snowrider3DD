@@ -108,44 +108,8 @@ let lastCanvasScore = 0;
 let canvasMonitorActive = false;
 
 function monitorCanvasForScore() {
-    if (canvasMonitorActive) return;
-    canvasMonitorActive = true;
-    
-    console.log('👁️ Started canvas score monitoring');
-    
-    setInterval(() => {
-        try {
-            const canvas = document.querySelector('#gameContainer canvas');
-            if (!canvas) return;
-            
-            // Check if game is showing "TAP TO RESTART" or game over screen
-            const ctx = canvas.getContext('2d');
-            const w = canvas.width;
-            const h = canvas.height;
-            
-            // Sample pixels from score area (bottom-left where "24 SCORE" appears)
-            const scoreRegion = ctx.getImageData(0, h * 0.7, w * 0.3, h * 0.3);
-            
-            // Look for white text pixels (score display is white)
-            let whitePixels = 0;
-            for (let i = 0; i < scoreRegion.data.length; i += 4) {
-                const r = scoreRegion.data[i];
-                const g = scoreRegion.data[i + 1];
-                const b = scoreRegion.data[i + 2];
-                const brightness = (r + g + b) / 3;
-                if (brightness > 200) whitePixels++;
-            }
-            
-            // If we detect lots of white pixels (score display), scan for actual score
-            if (whitePixels > 100) {
-                // Get text content from game - Unity renders text to canvas
-                const imageData = ctx.getImageData(0, h * 0.5, w * 0.5, h * 0.5);
-                scanImageForScore(imageData);
-            }
-        } catch (e) {
-            // Canvas might not be accessible yet
-        }
-    }, 1000);
+    // Disabled heavy canvas monitoring to avoid WebGL readback overhead
+    return;
 }
 
 function scanImageForScore(imageData) {
@@ -910,12 +874,9 @@ function startScoreMonitoring() {
     console.log('   3. localStorage monitoring with timestamp filtering');
     console.log('   4. localStorage.setItem interception');
     console.log('   5. IndexedDB scanning');
-    console.log('   6. Canvas pixel monitoring');
-    console.log('   7. localStorage monitoring');
+    console.log('   6. localStorage monitoring');
     
-    // Start canvas monitoring
-    monitorCanvasForScore();
-    
+    // Canvas monitoring disabled for stability
     // Start localStorage monitoring
     initLocalStorageMonitor();
     pollLocalStorage();

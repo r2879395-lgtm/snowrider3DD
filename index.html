@@ -97,28 +97,8 @@
                                     }
                                 };
                             }
-                            
-                            // Try cwrap method
-                            if (gameInstance.Module.cwrap) {
-                                const scoreFuncs = ['getScore', 'GetScore', 'get_score'];
-                                for (let funcName of scoreFuncs) {
-                                    try {
-                                        const getScore = gameInstance.Module.cwrap(funcName, 'number', []);
-                                        console.log("✅ Found Unity score function:", funcName);
-                                        
-                                        setInterval(() => {
-                                            try {
-                                                let score = getScore();
-                                                if (score > 0 && score !== window.latestDetectedScore) {
-                                                    console.log("🎯 Detected score via cwrap:", score);
-                                                    if (window.receiveScore) window.receiveScore(score);
-                                                }
-                                            } catch(e) {}
-                                        }, 500);
-                                        break;
-                                    } catch(e) {}
-                                }
-                            }
+                        
+                                // Removed cwrap polling to avoid repeated unknown-function assertions
                         }
                     } catch(e) {
                         console.log("ℹ️ Could not hook Unity Module - using SendMessage intercept only");
