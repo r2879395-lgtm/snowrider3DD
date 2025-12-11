@@ -12,6 +12,38 @@
     <script src="TemplateData/UnityProgress.js"></script>
     <script src="Build/UnityLoader.js"></script>
     <script>
+        // METHOD A: Intercept Unity SendMessage BEFORE Unity loads
+        (function() {
+            const originalSendMessage = window.SendMessage;
+
+            window.SendMessage = function(obj, method, value) {
+                try {
+                    // Detect score calls - Snow Rider 3D sends score on GameOver
+                    if (typeof value !== "undefined" && !isNaN(value) && Number(value) > 0) {
+                        const score = Number(value);
+                        console.log("🎯 Detected Unity SendMessage score:", score, "from", obj + "." + method);
+
+                        // Store and trigger score modal
+                        if (window.receiveScore) {
+                            window.receiveScore(score);
+                        } else {
+                            window.latestDetectedScore = score;
+                            console.log("✅ Score stored, waiting for leaderboard to initialize");
+                        }
+                    }
+                } catch (e) {
+                    console.error("❌ Error intercepting SendMessage:", e);
+                }
+
+                // Forward to original Unity SendMessage
+                if (originalSendMessage) {
+                    return originalSendMessage(obj, method, value);
+                }
+            };
+            
+            console.log("✅ Unity SendMessage interceptor installed");
+        })();
+        
         // Don't load Unity immediately - wait for player name
         var gameInstance = null;
         window.initUnity = function() {
@@ -30,6 +62,50 @@
                                     }
                                 };
                             }
+                            
+                            // METHOD B: Try to hook internal score getter via cwrap
+                            var cwrapCheck = setInterval(() => {
+                                if (!gameInstance.Module || !gameInstance.Module.cwrap) return;
+                                
+                                clearInterval(cwrapCheck);
+                                
+                                try {
+                                    // Try common score getter function names
+                                    const scoreFuncs = ['getScore', 'GetScore', 'get_score', 'currentScore'];
+                                    let getScore = null;
+                                    
+                                    for (let funcName of scoreFuncs) {
+                                        try {
+                                            getScore = gameInstance.Module.cwrap(funcName, 'number', []);
+                                            console.log("✅ Found Unity score function:", funcName);
+                                            break;
+                                        } catch(e) {
+                                            // Function doesn't exist, try next
+                                        }
+                                    }
+                                    
+                                    if (getScore) {
+                                        // Poll score every 300ms
+                                        setInterval(() => {
+                                            try {
+                                                let score = getScore();
+                                                if (score > 0 && score !== window.latestDetectedScore) {
+                                                    console.log("🎯 Detected score via cwrap:", score);
+                                                    if (window.receiveScore) {
+                                                        window.receiveScore(score);
+                                                    }
+                                                }
+                                            } catch(e) {
+                                                // Score function may not be ready yet
+                                            }
+                                        }, 300);
+                                    } else {
+                                        console.log("ℹ️ No internal score getter found - relying on SendMessage intercept");
+                                    }
+                                } catch(e) {
+                                    console.log("ℹ️ cwrap not available - using SendMessage intercept only");
+                                }
+                            }, 500);
                         } 
                     } 
                 });
