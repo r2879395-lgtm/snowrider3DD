@@ -49,13 +49,17 @@
         window.initUnity = function() {
             if (!gameInstance) {
                 gameInstance = UnityLoader.instantiate("gameContainer", "Build/SnowRider3D-gd-1.json", { 
-                    onProgress: UnityProgress, 
-                    Module: { 
-                        onRuntimeInitialized: function () { 
-                            UnityProgress(gameInstance, "complete");
+                    onProgress: UnityProgress
+                });
+                
+                // Wait for Unity to fully initialize before trying to hook
+                setTimeout(() => {
+                    try {
+                        if (gameInstance && gameInstance.Module) {
+                            console.log("✅ Unity Module loaded, attempting to hook score callbacks");
                             
-                            // Hook Unity score callback
-                            if (gameInstance.Module) {
+                            // Try to set score callback
+                            if (typeof gameInstance.Module.scoreCallback === 'undefined') {
                                 gameInstance.Module.scoreCallback = function(score) {
                                     if (window.receiveScore) {
                                         window.receiveScore(score);
@@ -63,52 +67,32 @@
                                 };
                             }
                             
-                            // METHOD B: Try to hook internal score getter via cwrap
-                            var cwrapCheck = setInterval(() => {
-                                if (!gameInstance.Module || !gameInstance.Module.cwrap) return;
-                                
-                                clearInterval(cwrapCheck);
-                                
-                                try {
-                                    // Try common score getter function names
-                                    const scoreFuncs = ['getScore', 'GetScore', 'get_score', 'currentScore'];
-                                    let getScore = null;
-                                    
-                                    for (let funcName of scoreFuncs) {
-                                        try {
-                                            getScore = gameInstance.Module.cwrap(funcName, 'number', []);
-                                            console.log("✅ Found Unity score function:", funcName);
-                                            break;
-                                        } catch(e) {
-                                            // Function doesn't exist, try next
-                                        }
-                                    }
-                                    
-                                    if (getScore) {
-                                        // Poll score every 300ms
+                            // Try cwrap method
+                            if (gameInstance.Module.cwrap) {
+                                const scoreFuncs = ['getScore', 'GetScore', 'get_score'];
+                                for (let funcName of scoreFuncs) {
+                                    try {
+                                        const getScore = gameInstance.Module.cwrap(funcName, 'number', []);
+                                        console.log("✅ Found Unity score function:", funcName);
+                                        
                                         setInterval(() => {
                                             try {
                                                 let score = getScore();
                                                 if (score > 0 && score !== window.latestDetectedScore) {
                                                     console.log("🎯 Detected score via cwrap:", score);
-                                                    if (window.receiveScore) {
-                                                        window.receiveScore(score);
-                                                    }
+                                                    if (window.receiveScore) window.receiveScore(score);
                                                 }
-                                            } catch(e) {
-                                                // Score function may not be ready yet
-                                            }
-                                        }, 300);
-                                    } else {
-                                        console.log("ℹ️ No internal score getter found - relying on SendMessage intercept");
-                                    }
-                                } catch(e) {
-                                    console.log("ℹ️ cwrap not available - using SendMessage intercept only");
+                                            } catch(e) {}
+                                        }, 500);
+                                        break;
+                                    } catch(e) {}
                                 }
-                            }, 500);
-                        } 
-                    } 
-                });
+                            }
+                        }
+                    } catch(e) {
+                        console.log("ℹ️ Could not hook Unity Module - using SendMessage intercept only");
+                    }
+                }, 3000);
             }
         };
     </script>
