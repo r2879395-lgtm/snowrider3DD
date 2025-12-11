@@ -1,59 +1,40 @@
 const rootPath = 'TemplateData';
 
 function UnityProgress(gameInstance, progress) {
-    if (!gameInstance.Module) {
-        return;
-    }
+  if (!gameInstance.Module) {
+    return;
+  }
 
-    if (!gameInstance.logo) {
-        gameInstance.logo = document.createElement("div");
-        gameInstance.logo.className = "logo " + gameInstance.Module.splashScreenStyle;
-        gameInstance.container.appendChild(gameInstance.logo);
+  // Hard-remove any splash elements so nothing lingers over the canvas
+  const removeSplash = () => {
+    if (gameInstance.logo && gameInstance.logo.parentNode) {
+      gameInstance.logo.parentNode.removeChild(gameInstance.logo);
+      gameInstance.logo = null;
     }
-
-    if (!gameInstance.progress) {
-        gameInstance.progress = document.createElement("div");
-        gameInstance.progress.className = "progress " + gameInstance.Module.splashScreenStyle;
-        gameInstance.progress.empty = document.createElement("div");
-        gameInstance.progress.empty.className = "empty";
-        gameInstance.progress.appendChild(gameInstance.progress.empty);
-        gameInstance.progress.full = document.createElement("div");
-        gameInstance.progress.full.className = "full";
-        gameInstance.progress.appendChild(gameInstance.progress.full);
-        gameInstance.container.appendChild(gameInstance.progress);
-        gameInstance.textProgress = document.createElement("div");
-        gameInstance.textProgress.className = "text";
-        gameInstance.container.appendChild(gameInstance.textProgress);
+    if (gameInstance.progress && gameInstance.progress.parentNode) {
+      gameInstance.progress.parentNode.removeChild(gameInstance.progress);
+      gameInstance.progress = null;
     }
-
-    gameInstance.progress.full.style.width = (100 * progress) + "%";
-    gameInstance.progress.empty.style.width = (100 * (1 - progress)) + "%";
-
-    //gameInstance.textProgress.innerHTML = 'Loading - ' + Math.floor(progress * 100) + '%' + ' <img src="' + rootPath + '/gears.gif" class="spinner" />';
-
-    if(progress>= 0.9 && progress<1)
-    {
-        gameInstance.textProgress.innerHTML = '100% - Running, Wait..';
-        gameInstance.progress.style.display = 'none';
+    if (gameInstance.textProgress && gameInstance.textProgress.parentNode) {
+      gameInstance.textProgress.parentNode.removeChild(gameInstance.textProgress);
+      gameInstance.textProgress = null;
     }
-    else
-    {
-        gameInstance.textProgress.innerHTML = 'Loading - ' + Math.floor(progress * 100) + '%';
-    }
+  };
 
-    /*
-    if (progress == 1) {
-        gameInstance.textProgress.innerHTML = 'Running, Please Wait.. <img src="' + rootPath + '/gears.gif" class="spinner" />';
-        gameInstance.progress.style.display = 'none';
-    }
-    */
+  // Fail-safe: remove splash quickly even if Unity callbacks misreport
+  if (!gameInstance._splashFailSafe) {
+    gameInstance._splashFailSafe = true;
+    setTimeout(removeSplash, 3000);
+    setTimeout(removeSplash, 7000);
+  }
 
-    if (progress == 'complete') {
-        SendMessage = gameInstance.SendMessage;
-        gameInstance.logo.style.display = 'none';
-        gameInstance.progress.style.display = 'none';
-        gameInstance.textProgress.style.display = 'none';
-    }
+  // Do not create any logo/progress DOM at all; just ensure canvas shows unobstructed
+  removeSplash();
+
+  // If canvas is present, strip overlays immediately
+  if (gameInstance.container && gameInstance.container.querySelector('canvas')) {
+    removeSplash();
+  }
 }
 
 window.Game = (function() {
