@@ -12,6 +12,14 @@
     <script src="TemplateData/UnityProgress.js"></script>
     <script src="Build/UnityLoader.js"></script>
     <script>
+        // Suppress Unity's getParameter errors (known Unity WebGL issue)
+        window.addEventListener('error', function(e) {
+            if (e.message && e.message.includes('getParameter')) {
+                e.preventDefault();
+                return true;
+            }
+        });
+        
         // METHOD A: Intercept Unity SendMessage BEFORE Unity loads
         (function() {
             const originalSendMessage = window.SendMessage;
@@ -48,9 +56,21 @@
         var gameInstance = null;
         window.initUnity = function() {
             if (!gameInstance) {
-                gameInstance = UnityLoader.instantiate("gameContainer", "Build/SnowRider3D-gd-1.json", { 
-                    onProgress: UnityProgress
-                });
+                try {
+                    const container = document.getElementById("gameContainer");
+                    if (!container) {
+                        console.error("❌ gameContainer not found");
+                        return;
+                    }
+                    
+                    gameInstance = UnityLoader.instantiate("gameContainer", "Build/SnowRider3D-gd-1.json", { 
+                        onProgress: UnityProgress
+                    });
+                } catch (error) {
+                    console.error("❌ Error loading Unity:", error);
+                    alert("Failed to load game. Please refresh the page and try again.");
+                    return;
+                }
                 
                 // Wait for Unity to fully initialize before trying to hook
                 setTimeout(() => {
