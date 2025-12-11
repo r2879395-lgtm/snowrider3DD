@@ -16,7 +16,23 @@
         var gameInstance = null;
         window.initUnity = function() {
             if (!gameInstance) {
-                gameInstance = UnityLoader.instantiate("gameContainer", "Build/SnowRider3D-gd-1.json", { onProgress: UnityProgress, Module: { onRuntimeInitialized: function () { UnityProgress(gameInstance, "complete") } } });
+                gameInstance = UnityLoader.instantiate("gameContainer", "Build/SnowRider3D-gd-1.json", { 
+                    onProgress: UnityProgress, 
+                    Module: { 
+                        onRuntimeInitialized: function () { 
+                            UnityProgress(gameInstance, "complete");
+                            
+                            // Hook Unity score callback
+                            if (gameInstance.Module) {
+                                gameInstance.Module.scoreCallback = function(score) {
+                                    if (window.receiveScore) {
+                                        window.receiveScore(score);
+                                    }
+                                };
+                            }
+                        } 
+                    } 
+                });
             }
         };
     </script>

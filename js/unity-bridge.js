@@ -34,6 +34,47 @@ window.SubmitScoreToLeaderboard = function(score) {
     submitScoreToLeaderboard(score);
 };
 
+// Snow Rider 3D Unity callbacks for auto score detection
+window.receiveScore = function(score) {
+    console.log('🎮 Unity score detected via receiveScore:', score);
+    const numScore = Number(score);
+    
+    if (isNaN(numScore) || numScore < SCORE_CONFIG.minScore || numScore > SCORE_CONFIG.maxScore) {
+        console.log('⚠️ Invalid score from Unity:', score);
+        return;
+    }
+    
+    // Store latest detected score
+    window.latestDetectedScore = numScore;
+    lastDetectedScore = numScore;
+    lastScoreTime = Date.now();
+    
+    console.log('✅ Auto-detected score:', numScore);
+    
+    // Auto-open score submission modal
+    if (window.leaderboard && window.leaderboard.showScoreModal) {
+        window.leaderboard.currentScore = numScore;
+        window.leaderboard.showScoreModal(numScore);
+    } else {
+        console.log('⚠️ Leaderboard not ready, storing score for manual submission');
+    }
+};
+
+// Alternative Unity callback - some versions use OnGameEvent
+window.OnGameEvent = function(eventName, value) {
+    console.log('🎮 Unity event:', eventName, value);
+    
+    if (eventName === 'score' || eventName === 'finalscore' || eventName === 'gameOver') {
+        window.receiveScore(value);
+    }
+};
+
+// Fallback - some versions use SendScore
+window.SendScore = function(score) {
+    console.log('🎮 Unity SendScore called:', score);
+    window.receiveScore(score);
+};
+
 // Core score submission function
 function submitScoreToLeaderboard(score) {
     const numScore = parseInt(score);
