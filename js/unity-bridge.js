@@ -95,10 +95,66 @@ function submitScoreToLeaderboard(score) {
     lastDetectedScore = numScore;
     lastScoreTime = Date.now();
     
-    // Disabled: Automatic score submission
-    // Users must manually use the "➕ Submit Score" button
-    console.log('ℹ️ Automatic submission disabled - use Submit Score button to add to leaderboard');
-    return false;
+    // Trigger score modal with detected score
+    if (window.receiveScore) {
+        window.receiveScore(numScore);
+    }
+    
+    return true;
+}
+
+// METHOD C: Monitor Unity canvas for score display changes
+let lastCanvasScore = 0;
+let canvasMonitorActive = false;
+
+function monitorCanvasForScore() {
+    if (canvasMonitorActive) return;
+    canvasMonitorActive = true;
+    
+    console.log('👁️ Started canvas score monitoring');
+    
+    setInterval(() => {
+        try {
+            const canvas = document.querySelector('#gameContainer canvas');
+            if (!canvas) return;
+            
+            // Check if game is showing "TAP TO RESTART" or game over screen
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width;
+            const h = canvas.height;
+            
+            // Sample pixels from score area (bottom-left where "24 SCORE" appears)
+            const scoreRegion = ctx.getImageData(0, h * 0.7, w * 0.3, h * 0.3);
+            
+            // Look for white text pixels (score display is white)
+            let whitePixels = 0;
+            for (let i = 0; i < scoreRegion.data.length; i += 4) {
+                const r = scoreRegion.data[i];
+                const g = scoreRegion.data[i + 1];
+                const b = scoreRegion.data[i + 2];
+                const brightness = (r + g + b) / 3;
+                if (brightness > 200) whitePixels++;
+            }
+            
+            // If we detect lots of white pixels (score display), scan for actual score
+            if (whitePixels > 100) {
+                // Get text content from game - Unity renders text to canvas
+                const imageData = ctx.getImageData(0, h * 0.5, w * 0.5, h * 0.5);
+                scanImageForScore(imageData);
+            }
+        } catch (e) {
+            // Canvas might not be accessible yet
+        }
+    }, 1000);
+}
+
+function scanImageForScore(imageData) {
+    // Simple brightness-based text detection
+    // Unity renders white score text, we can detect patterns
+    // This is a simplified version - full OCR would be more accurate
+    
+    // For now, just log that we're monitoring
+    // The manual "Submit Score" button will work as fallback
 }
 
 // Validate if a number could be a score vs a timestamp
@@ -785,6 +841,10 @@ function startScoreMonitoring() {
     console.log('   3. localStorage monitoring with timestamp filtering');
     console.log('   4. localStorage.setItem interception');
     console.log('   5. IndexedDB scanning');
+    console.log('   6. Canvas pixel monitoring');
+    
+    // Start canvas monitoring
+    monitorCanvasForScore();
     
     // Collect initial timestamps to avoid false positives
     setTimeout(() => {
@@ -991,11 +1051,22 @@ window.debugTestFirebaseWrite = async function() {
     }
 };
 
+// Test command to simulate score detection
+window.testScoreDetection = function(score = 24) {
+    console.log(`🧪 Testing score detection with score: ${score}`);
+    if (window.receiveScore) {
+        window.receiveScore(score);
+    } else {
+        console.log('❌ receiveScore function not found');
+    }
+};
+
 // Log when the bridge is ready
 console.log('════════════════════════════════════════════════════════════');
 console.log('🏆 Unity-Leaderboard Bridge Initialized');
 console.log('════════════════════════════════════════════════════════════');
 console.log('📋 Testing commands:');
+console.log('   testScoreDetection(24) - Simulate score detection');
 console.log('   testLeaderboard()      - Add sample scores');
 console.log('   debugFirebase()        - Check Firebase connection');
 console.log('   debugTestFirebaseWrite() - Test write permissions');
@@ -1003,5 +1074,6 @@ console.log('   Press "➕ Submit Score" button - Manual score entry');
 console.log('════════════════════════════════════════════════════════════');
 console.log('🔍 Auto-detection: Active with smart timestamp filtering');
 console.log('💡 Watch this console - you\'ll see logs when scores are detected!');
+console.log('💡 Try: testScoreDetection(24) to test the modal');
 console.log('════════════════════════════════════════════════════════════');
 
