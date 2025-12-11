@@ -449,28 +449,6 @@ class Leaderboard {
         document.addEventListener('keydown', this.stopUnityKeys, true);
         document.addEventListener('keyup', this.stopUnityKeys, true);
         document.addEventListener('keypress', this.stopUnityKeys, true);
-        
-        // Aggressively focus the input
-        if (this.playerNameInput) {
-            // Multiple focus attempts
-            this.playerNameInput.focus();
-            this.playerNameInput.select();
-            
-            setTimeout(() => {
-                this.playerNameInput.focus();
-                this.playerNameInput.select();
-            }, 10);
-            
-            setTimeout(() => {
-                this.playerNameInput.focus();
-                this.playerNameInput.select();
-            }, 100);
-            
-            setTimeout(() => {
-                this.playerNameInput.focus();
-                this.playerNameInput.select();
-            }, 300);
-        }
     }
 
     stopUnityKeys(e) {
