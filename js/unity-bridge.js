@@ -157,6 +157,75 @@ function scanImageForScore(imageData) {
     // The manual "Submit Score" button will work as fallback
 }
 
+// METHOD D: Monitor localStorage for score writes
+let localStorageSnapshot = {};
+
+function initLocalStorageMonitor() {
+    // Take initial snapshot
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        localStorageSnapshot[key] = localStorage.getItem(key);
+    }
+    
+    // Override setItem to catch writes
+    const originalSetItem = localStorage.setItem;
+    localStorage.setItem = function(key, value) {
+        try {
+            // Check if this is a new score value
+            const numValue = Number(value);
+            if (!isNaN(numValue) && numValue > 0 && numValue < SCORE_CONFIG.maxScore) {
+                // Check if this is likely a score (not a timestamp)
+                const oldValue = localStorageSnapshot[key];
+                if (oldValue !== value && isLikelyScore(numValue)) {
+                    console.log(`💾 localStorage change detected: ${key} = ${value}`);
+                    
+                    // Common Unity PlayerPrefs keys for scores
+                    const scoreKeys = ['score', 'highscore', 'bestscore', 'finalscore', 'lastscore', 'currentscore'];
+                    const keyLower = key.toLowerCase();
+                    
+                    if (scoreKeys.some(sk => keyLower.includes(sk))) {
+                        console.log(`🎯 Score detected in localStorage.${key}:`, numValue);
+                        submitScoreToLeaderboard(numValue);
+                    }
+                }
+                localStorageSnapshot[key] = value;
+            }
+        } catch (e) {
+            // Silent fail
+        }
+        
+        return originalSetItem.call(localStorage, key, value);
+    };
+    
+    console.log('💾 localStorage monitor installed');
+}
+
+// Watch for ANY changes to localStorage
+function pollLocalStorage() {
+    setInterval(() => {
+        try {
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                const value = localStorage.getItem(key);
+                
+                if (localStorageSnapshot[key] !== value) {
+                    const numValue = Number(value);
+                    if (!isNaN(numValue) && isLikelyScore(numValue)) {
+                        const keyLower = key.toLowerCase();
+                        if (keyLower.includes('score') || keyLower.includes('point') || keyLower.includes('best')) {
+                            console.log(`🎯 Score change detected in localStorage.${key}:`, numValue);
+                            submitScoreToLeaderboard(numValue);
+                        }
+                    }
+                    localStorageSnapshot[key] = value;
+                }
+            }
+        } catch (e) {
+            // Silent fail
+        }
+    }, 500);
+}
+
 // Validate if a number could be a score vs a timestamp
 function isLikelyScore(value) {
     const num = typeof value === 'string' ? parseInt(value) : value;
@@ -842,9 +911,14 @@ function startScoreMonitoring() {
     console.log('   4. localStorage.setItem interception');
     console.log('   5. IndexedDB scanning');
     console.log('   6. Canvas pixel monitoring');
+    console.log('   7. localStorage monitoring');
     
     // Start canvas monitoring
     monitorCanvasForScore();
+    
+    // Start localStorage monitoring
+    initLocalStorageMonitor();
+    pollLocalStorage();
     
     // Collect initial timestamps to avoid false positives
     setTimeout(() => {
