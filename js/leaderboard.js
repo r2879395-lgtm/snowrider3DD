@@ -484,13 +484,11 @@ class Leaderboard {
         const allowedTargets = [
             this.welcomePlayerNameInput,
             this.welcomeStartBtn,
-            this.submitScoreBtn,
-            document.getElementById('floatingChatInput'),
-            document.getElementById('floatingChatSendBtn')
+            this.submitScoreBtn
         ].filter(Boolean);
 
         const isAllowed = allowedTargets.some(el => el === e.target) ||
-            (e.target.closest && (e.target.closest('.modal') || e.target.closest('.floating-chat-popup')));
+            (e.target.closest && e.target.closest('.modal'));
 
         if (!isAllowed) {
             e.stopPropagation();
@@ -724,10 +722,7 @@ class Leaderboard {
         this.currentPlayerName = name;
         console.log('👤 Welcome,', name);
 
-        // Update chat system with new player name
-        if (window.chat) {
-            window.chat.updatePlayerName(name);
-        }
+        // Chat feature removed
 
         // Update active player name in Firebase
         if (this.activePlayersRef) {
