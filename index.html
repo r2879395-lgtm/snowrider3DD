@@ -158,19 +158,56 @@
                         if (gameInstance && gameInstance.Module) {
                             console.log("✅ Unity Module loaded, attempting to hook score callbacks");
                             
+                            // Attempt to hook gameInstance.SendMessage directly
+                            if (gameInstance.SendMessage && typeof gameInstance.SendMessage === 'function') {
+                                const originalGameSendMessage = gameInstance.SendMessage;
+                                gameInstance.SendMessage = function(obj, method, value) {
+                                    console.log("🎮 gameInstance.SendMessage called:", { obj, method, value });
+                                    if (typeof value !== "undefined" && !isNaN(value) && Number(value) > 0) {
+                                        console.log("🎯 Score detected via gameInstance.SendMessage:", value);
+                                        if (window.receiveScore) {
+                                            window.receiveScore(Number(value));
+                                        }
+                                    }
+                                    return originalGameSendMessage.call(this, obj, method, value);
+                                };
+                                console.log("✅ gameInstance.SendMessage hooked");
+                            }
+                            
                             // Try to set score callback
                             if (typeof gameInstance.Module.scoreCallback === 'undefined') {
                                 gameInstance.Module.scoreCallback = function(score) {
+                                    console.log("🎯 Score callback triggered:", score);
                                     if (window.receiveScore) {
                                         window.receiveScore(score);
                                     }
                                 };
+                                console.log("✅ gameInstance.Module.scoreCallback installed");
                             }
                         
-                                // Removed cwrap polling to avoid repeated unknown-function assertions
+                            // Try to hook into canvas context for state monitoring
+                            const canvas = gameInstance.container.querySelector('canvas');
+                            if (canvas) {
+                                console.log("✅ Canvas found:", canvas.width, "x", canvas.height);
+                                // Monitor for when canvas stops rendering (game end)
+                                let lastPixelData = null;
+                                setInterval(() => {
+                                    try {
+                                        const ctx = canvas.getContext('webgl') || canvas.getContext('2d');
+                                        if (ctx && ctx.getImageData) {
+                                            const data = ctx.getImageData(0, 0, 1, 1);
+                                            if (JSON.stringify(data) !== lastPixelData) {
+                                                lastPixelData = JSON.stringify(data);
+                                            }
+                                        }
+                                    } catch (e) {
+                                        // Canvas context unavailable
+                                    }
+                                }, 1000);
+                            }
                         }
                     } catch(e) {
-                        console.log("ℹ️ Could not hook Unity Module - using SendMessage intercept only");
+                        console.log("ℹ️ Could not fully hook Unity Module:", e.message);
                     }
                 }, 3000);
             }
@@ -194,6 +231,9 @@
     
     <!-- Manual Score Entry Button -->
     <button id="scanScoreBtn" class="scan-score-btn">➕ Submit Score</button>
+    
+    <!-- Test Score Detection Button (for debugging) -->
+    <button id="testScoreBtn" class="scan-score-btn" style="top: 140px; background: linear-gradient(135deg, #ffaa00 0%, #ff8800 100%);">🧪 Test Score (6)</button>
     
     <!-- Admin Remove Scores Button -->
     <button id="removeScoresBtn" class="remove-scores-btn">🗑️ Remove Scores</button>
