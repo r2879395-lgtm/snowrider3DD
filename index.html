@@ -40,6 +40,7 @@
         // METHOD A: Intercept Unity SendMessage BEFORE Unity loads
         (function() {
             const originalSendMessage = window.SendMessage;
+            let pendingScores = [];
 
             window.SendMessage = function(obj, method, value) {
                 try {
@@ -53,7 +54,21 @@
                             window.receiveScore(score);
                         } else {
                             window.latestDetectedScore = score;
-                            console.log("✅ Score stored, waiting for leaderboard to initialize");
+                            pendingScores.push(score);
+                            console.log("📥 Score stored (leaderboard not ready yet), queue:", pendingScores);
+                            
+                            // Retry every 100ms for up to 5 seconds
+                            let retries = 0;
+                            const retryInterval = setInterval(() => {
+                                if (window.receiveScore && pendingScores.length > 0) {
+                                    const queuedScore = pendingScores.shift();
+                                    console.log("↩️ Retrying queued score:", queuedScore);
+                                    window.receiveScore(queuedScore);
+                                    clearInterval(retryInterval);
+                                } else if (++retries > 50) {
+                                    clearInterval(retryInterval);
+                                }
+                            }, 100);
                         }
                     }
                 } catch (e) {

@@ -38,7 +38,7 @@ window.SubmitScoreToLeaderboard = function(score) {
 
 // Snow Rider 3D Unity callbacks for auto score detection
 window.receiveScore = function(score) {
-    console.log('🎮 Unity score detected via receiveScore:', score);
+    console.log('🎮 receiveScore called with:', score);
     const numScore = Number(score);
     
     if (isNaN(numScore) || numScore < SCORE_CONFIG.minScore || numScore > SCORE_CONFIG.maxScore) {
@@ -61,14 +61,26 @@ window.receiveScore = function(score) {
     lastDetectedScore = numScore;
     lastScoreTime = now;
     
-    console.log('✅ Auto-detected score:', numScore);
+    console.log('✅ Auto-detected score (valid):', numScore);
+    console.log('   leaderboard ready?', !!window.leaderboard);
+    console.log('   showScoreModal method?', !!(window.leaderboard && window.leaderboard.showScoreModal));
     
     // Auto-open score submission modal
     if (window.leaderboard && window.leaderboard.showScoreModal) {
         window.leaderboard.currentScore = numScore;
+        console.log('🎯 Calling showScoreModal with score:', numScore);
         window.leaderboard.showScoreModal(numScore);
     } else {
-        console.log('⚠️ Leaderboard not ready, storing score for manual submission');
+        console.log('⚠️ Leaderboard not ready yet, cannot show modal');
+        console.log('   Waiting for leaderboard to initialize...');
+        // Retry after a short delay
+        setTimeout(() => {
+            if (window.leaderboard && window.leaderboard.showScoreModal) {
+                console.log('🔄 Retrying showScoreModal with score:', numScore);
+                window.leaderboard.currentScore = numScore;
+                window.leaderboard.showScoreModal(numScore);
+            }
+        }, 500);
     }
 };
 
