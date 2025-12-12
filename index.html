@@ -37,23 +37,24 @@
             document.write('<p style="color:white;">UnityLoader failed to load. Please refresh.</p>');
         }
         
-        // Slowdown toggle: press 'X' to toggle slowdown mode
+        // Slowdown toggle: press 'X' to cycle slowdown levels
         (function() {
-            let slowdownEnabled = false;
             let lastToggle = 0;
-            const debounceMs = 300;
+            const debounceMs = 250;
+            const levels = [1.0, 0.7, 0.5, 0.3];
+            let levelIndex = 0;
 
             function trySendSlowdown(multiplier) {
                 // Attempt common Unity targets/methods for slowdown
                 const targets = ['GameController', 'Player', 'Controller', 'GameManager'];
-                const methods = ['SetSpeedMultiplier', 'SetTimeScale', 'ApplySlowdown'];
+                const methods = ['SetSpeedMultiplier', 'SetTimeScale', 'ApplySlowdown', 'OnSpeedChanged'];
                 for (const t of targets) {
                     for (const m of methods) {
                         try {
                             if (window.SendMessage) {
                                 window.SendMessage(t, m, String(multiplier));
                                 console.log(`⏬ Sent slowdown: ${t}.${m}(${multiplier})`);
-                                return true;
+                                // don't return immediately; try all combos to increase chance
                             }
                         } catch (e) { /* continue */ }
                     }
@@ -62,9 +63,7 @@
                 return false;
             }
 
-            window.applySlowdown = function(enable) {
-                slowdownEnabled = !!enable;
-                const ok = trySendSlowdown(slowdownEnabled ? 0.5 : 1.0);
+            function updateIndicator(multiplier, ok) {
                 // Visual indicator overlay
                 const id = 'slowdownIndicator';
                 let el = document.getElementById(id);
@@ -80,20 +79,24 @@
                     el.style.fontWeight = 'bold';
                     document.body.appendChild(el);
                 }
-                el.textContent = slowdownEnabled ? '⏬ Slow Mode ON' : '⏩ Slow Mode OFF';
-                el.style.background = slowdownEnabled ? 'rgba(255, 170, 0, 0.85)' : 'rgba(0,0,0,0.5)';
-                el.style.color = slowdownEnabled ? '#000' : '#fff';
+                const isSlow = multiplier < 1.0;
+                el.textContent = isSlow ? `⏬ Slow Mode ${Math.round(multiplier*100)}%` : '⏩ Slow Mode OFF';
+                el.style.background = isSlow ? 'rgba(255, 170, 0, 0.85)' : 'rgba(0,0,0,0.5)';
+                el.style.color = isSlow ? '#000' : '#fff';
                 if (!ok) {
                     el.textContent += ' (visual only)';
                 }
-            };
+            }
 
             window.addEventListener('keydown', (e) => {
                 if ((Date.now() - lastToggle) < debounceMs) return;
-                // Toggle on X key
+                // Cycle on X key
                 if (e.key && e.key.toLowerCase() === 'x') {
                     lastToggle = Date.now();
-                    window.applySlowdown(!slowdownEnabled);
+                    levelIndex = (levelIndex + 1) % levels.length;
+                    const mul = levels[levelIndex];
+                    const ok = trySendSlowdown(mul);
+                    updateIndicator(mul, ok);
                 }
             });
         })();
