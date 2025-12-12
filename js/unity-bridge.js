@@ -25,6 +25,7 @@ let lastDetectedScore = 0;
 let lastScoreTime = 0;
 let lastModalShownScore = 0;
 let lastModalShownTime = 0;
+let lastDomDetectedScore = 0;
 let gameStartTime = Date.now();
 let knownTimestamps = new Set();
 let ocrReady = false;
@@ -799,6 +800,31 @@ function monitorDOMForScore() {
             console.log('⚠️ DOM monitoring error:', e);
         }
     }, SCORE_CONFIG.domCheckInterval);
+    
+        // METHOD D: Monitor on-screen text for game-over score (e.g., "SCORE 6" with "TAP TO RESTART")
+        setInterval(() => {
+            try {
+                const text = document.body ? document.body.innerText : '';
+                if (!text) return;
+
+                // Only attempt when game-over UI is visible
+                if (!/tap to restart/i.test(text)) return;
+
+                const match = text.match(/score\s+(\d+)/i);
+                if (match) {
+                    const domScore = parseInt(match[1]);
+                    if (!isNaN(domScore) && domScore > 0 && domScore !== lastDomDetectedScore) {
+                        lastDomDetectedScore = domScore;
+                        console.log('🖥️ Score detected from screen text:', domScore);
+                        if (window.receiveScore) {
+                            window.receiveScore(domScore);
+                        }
+                    }
+                }
+            } catch (e) {
+                // Silent failure to avoid disrupting the game
+            }
+        }, 500);
 }
 
 // METHOD 2: Monitor localStorage with smart filtering
