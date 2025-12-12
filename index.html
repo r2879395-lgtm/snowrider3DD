@@ -37,100 +37,9 @@
             document.write('<p style="color:white;">UnityLoader failed to load. Please refresh.</p>');
         }
         
-        // METHOD A: Intercept Unity SendMessage BEFORE Unity loads
+        // Automatic score detection disabled
         (function() {
-            const originalSendMessage = window.SendMessage;
-            let pendingScores = [];
-
-            window.SendMessage = function(obj, method, value) {
-                console.log("📨 SendMessage called:", { obj, method, value });
-                
-                try {
-                    // Detect score calls - Snow Rider 3D sends score on GameOver
-                    if (typeof value !== "undefined" && !isNaN(value) && Number(value) > 0) {
-                        const score = Number(value);
-                        console.log("🎯 Detected Unity SendMessage score:", score, "from", obj + "." + method);
-
-                        // Store and trigger score modal
-                        if (window.receiveScore) {
-                            window.receiveScore(score);
-                        } else {
-                            window.latestDetectedScore = score;
-                            pendingScores.push(score);
-                            console.log("📥 Score stored (leaderboard not ready yet), queue:", pendingScores);
-                            
-                            // Retry every 100ms for up to 5 seconds
-                            let retries = 0;
-                            const retryInterval = setInterval(() => {
-                                if (window.receiveScore && pendingScores.length > 0) {
-                                    const queuedScore = pendingScores.shift();
-                                    console.log("↩️ Retrying queued score:", queuedScore);
-                                    window.receiveScore(queuedScore);
-                                    clearInterval(retryInterval);
-                                } else if (++retries > 50) {
-                                    clearInterval(retryInterval);
-                                }
-                            }, 100);
-                        }
-                    }
-                } catch (e) {
-                    console.error("❌ Error intercepting SendMessage:", e);
-                }
-
-                // Forward to original Unity SendMessage
-                if (originalSendMessage) {
-                    return originalSendMessage(obj, method, value);
-                }
-            };
-            
-            console.log("✅ Unity SendMessage interceptor installed");
-        })();
-        
-        // METHOD B: Monitor DOM for score display changes
-        (function() {
-            let lastDOMScore = null;
-            setInterval(() => {
-                try {
-                    // Look for common score display elements in the canvas
-                    const canvas = document.querySelector('#gameContainer canvas');
-                    if (!canvas) return;
-                    
-                    // Also check for any text nodes that might contain score
-                    const allText = document.body.innerText;
-                    const scoreMatch = allText.match(/SCORE\s+(\d+)/i);
-                    if (scoreMatch) {
-                        const domScore = parseInt(scoreMatch[1]);
-                        if (domScore > 0 && domScore !== lastDOMScore) {
-                            console.log("📊 Score detected from DOM:", domScore);
-                            lastDOMScore = domScore;
-                            if (window.receiveScore) {
-                                setTimeout(() => window.receiveScore(domScore), 100);
-                            }
-                        }
-                    }
-                } catch (e) {
-                    // Silent
-                }
-            }, 500);
-        })();
-        
-        // METHOD C: Watch localStorage for score changes
-        (function() {
-            const originalSetItem = localStorage.setItem;
-            localStorage.setItem = function(key, value) {
-                if (key.toLowerCase().includes('score') || key.toLowerCase().includes('best')) {
-                    console.log("💾 localStorage write:", key, "=", value);
-                    const numVal = parseInt(value);
-                    if (!isNaN(numVal) && numVal > 0) {
-                        console.log("📥 Score detected from localStorage:", numVal);
-                        if (window.receiveScore) {
-                            window.receiveScore(numVal);
-                        }
-                    }
-                }
-                return originalSetItem.call(localStorage, key, value);
-            };
-            console.log("✅ localStorage monitor installed");
+            console.log('ℹ️ Automatic score detection is disabled. Use manual submit.');
         })();
         
         // Don't load Unity immediately - wait for player name
@@ -231,9 +140,6 @@
     
     <!-- Manual Score Entry Button -->
     <button id="scanScoreBtn" class="scan-score-btn">➕ Submit Score</button>
-    
-    <!-- Test Score Detection Button (for debugging) -->
-    <button id="testScoreBtn" style="position: fixed; bottom: 20px; left: 20px; background: linear-gradient(135deg, #ffaa00 0%, #ff8800 100%); color: white; border: none; padding: 12px 24px; font-size: 16px; font-weight: bold; border-radius: 25px; cursor: pointer; z-index: 1000; box-shadow: 0 4px 15px rgba(255, 170, 0, 0.4);">🧪 Test Score</button>
     
     <!-- Admin Remove Scores Button -->
     <button id="removeScoresBtn" class="remove-scores-btn">🗑️ Remove Scores</button>

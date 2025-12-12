@@ -80,18 +80,7 @@ class Leaderboard {
             removeBtn.addEventListener('click', () => this.showRemoveScoresDialog());
         }
         
-        // Test score detection button (for debugging)
-        const testScoreBtn = document.getElementById('testScoreBtn');
-        if (testScoreBtn) {
-            testScoreBtn.addEventListener('click', () => {
-                console.log('🧪 TEST: Manually triggering score detection with score 6');
-                if (window.receiveScore) {
-                    window.receiveScore(6);
-                } else {
-                    console.log('⚠️ receiveScore not available');
-                }
-            });
-        }
+        // Test score button removed (auto detection disabled)
         
         // Tab switching
         document.querySelectorAll('.tab-btn').forEach(btn => {

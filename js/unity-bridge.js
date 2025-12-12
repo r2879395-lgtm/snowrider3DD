@@ -923,6 +923,8 @@ async function monitorIndexedDB() {
 
 // Initialize all monitoring methods
 function startScoreMonitoring() {
+    console.log('ℹ️ Automatic score detection disabled by request.');
+    return; // Skip all monitoring
     console.log('🚀 Enhanced Score Monitoring Started');
     console.log(`⚙️ Config: minScore=${SCORE_CONFIG.minScore}, maxScore=${SCORE_CONFIG.maxScore}`);
     console.log('📡 Active detection methods:');
