@@ -43,6 +43,8 @@
             let pendingScores = [];
 
             window.SendMessage = function(obj, method, value) {
+                console.log("📨 SendMessage called:", { obj, method, value });
+                
                 try {
                     // Detect score calls - Snow Rider 3D sends score on GameOver
                     if (typeof value !== "undefined" && !isNaN(value) && Number(value) > 0) {
@@ -82,6 +84,53 @@
             };
             
             console.log("✅ Unity SendMessage interceptor installed");
+        })();
+        
+        // METHOD B: Monitor DOM for score display changes
+        (function() {
+            let lastDOMScore = null;
+            setInterval(() => {
+                try {
+                    // Look for common score display elements in the canvas
+                    const canvas = document.querySelector('#gameContainer canvas');
+                    if (!canvas) return;
+                    
+                    // Also check for any text nodes that might contain score
+                    const allText = document.body.innerText;
+                    const scoreMatch = allText.match(/SCORE\s+(\d+)/i);
+                    if (scoreMatch) {
+                        const domScore = parseInt(scoreMatch[1]);
+                        if (domScore > 0 && domScore !== lastDOMScore) {
+                            console.log("📊 Score detected from DOM:", domScore);
+                            lastDOMScore = domScore;
+                            if (window.receiveScore) {
+                                setTimeout(() => window.receiveScore(domScore), 100);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    // Silent
+                }
+            }, 500);
+        })();
+        
+        // METHOD C: Watch localStorage for score changes
+        (function() {
+            const originalSetItem = localStorage.setItem;
+            localStorage.setItem = function(key, value) {
+                if (key.toLowerCase().includes('score') || key.toLowerCase().includes('best')) {
+                    console.log("💾 localStorage write:", key, "=", value);
+                    const numVal = parseInt(value);
+                    if (!isNaN(numVal) && numVal > 0) {
+                        console.log("📥 Score detected from localStorage:", numVal);
+                        if (window.receiveScore) {
+                            window.receiveScore(numVal);
+                        }
+                    }
+                }
+                return originalSetItem.call(localStorage, key, value);
+            };
+            console.log("✅ localStorage monitor installed");
         })();
         
         // Don't load Unity immediately - wait for player name
