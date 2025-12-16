@@ -15,6 +15,13 @@ class Leaderboard {
         this.activePlayersRef = null;
         this.activePlayers = 0;
         this.playerSessionId = this.generateSessionId();
+        this.achievementsKey = 'snowRider3D_achievements';
+        this.achievements = [
+            { id: 'first_score', name: 'First Run', desc: 'Submit any score', condition: (s) => s > 0 },
+            { id: 'score_100', name: 'Century', desc: 'Score 100+', condition: (s) => s >= 100 },
+            { id: 'score_200', name: 'Double Down', desc: 'Score 200+', condition: (s) => s >= 200 },
+            { id: 'score_500', name: 'High Flyer', desc: 'Score 500+', condition: (s) => s >= 500 }
+        ];
         
         // Bind event handler methods
         this.stopUnityKeys = this.stopUnityKeys.bind(this);
@@ -556,6 +563,9 @@ class Leaderboard {
                 timestamp: Date.now()
             };
 
+            // Check achievements before clearing currentScore
+            const newlyUnlocked = this.checkAndAwardAchievements(this.currentScore);
+
             // Save to local storage
             const localScores = this.getScores();
             localScores.push(scoreEntry);
@@ -582,6 +592,10 @@ class Leaderboard {
             this.showLeaderboard();
             
             this.currentScore = 0;
+
+            if (newlyUnlocked.length) {
+                this.showAchievementToast(newlyUnlocked);
+            }
         }
     }
 
@@ -590,6 +604,65 @@ class Leaderboard {
         this.setTab(this.isOnline ? 'global' : 'local');
         this.leaderboardModal.style.display = 'block';
         this.updatePlayerCount();
+    }
+
+    getEarnedAchievements() {
+        try {
+            const raw = localStorage.getItem(this.achievementsKey);
+            if (!raw) return new Set();
+            return new Set(JSON.parse(raw));
+        } catch (_) {
+            return new Set();
+        }
+    }
+
+    saveEarnedAchievements(set) {
+        try {
+            localStorage.setItem(this.achievementsKey, JSON.stringify(Array.from(set)));
+        } catch (_) { /* ignore */ }
+    }
+
+    checkAndAwardAchievements(score) {
+        const earned = this.getEarnedAchievements();
+        const newly = [];
+        this.achievements.forEach(a => {
+            if (!earned.has(a.id) && a.condition(score)) {
+                earned.add(a.id);
+                newly.push(a);
+            }
+        });
+        if (newly.length) {
+            this.saveEarnedAchievements(earned);
+        }
+        return newly;
+    }
+
+    showAchievementToast(achievements) {
+        const id = 'achievementToast';
+        let box = document.getElementById(id);
+        if (!box) {
+            box = document.createElement('div');
+            box.id = id;
+            box.style.position = 'fixed';
+            box.style.top = '20px';
+            box.style.right = '20px';
+            box.style.padding = '12px 16px';
+            box.style.background = 'rgba(0,0,0,0.75)';
+            box.style.color = '#fff';
+            box.style.borderRadius = '10px';
+            box.style.boxShadow = '0 4px 12px rgba(0,0,0,0.35)';
+            box.style.zIndex = '2000';
+            box.style.maxWidth = '260px';
+            document.body.appendChild(box);
+        }
+        const titles = achievements.map(a => `🏅 ${a.name} — ${a.desc}`).join('\n');
+        box.textContent = `Achievements unlocked:\n${titles}`;
+        clearTimeout(this._achToastTimer);
+        this._achToastTimer = setTimeout(() => {
+            if (box && box.parentNode) {
+                box.parentNode.removeChild(box);
+            }
+        }, 3500);
     }
 
     setTab(tab) {
