@@ -16,6 +16,7 @@ class Leaderboard {
         this.activePlayers = 0;
         this.playerSessionId = this.generateSessionId();
         this.achievementsKey = 'snowRider3D_achievements';
+        this.adminAccessCode = this.resolveAdminAccessCode();
         this.achievements = [
             { id: 'first_score', name: 'First Run', desc: 'Submit any score', condition: (s) => s > 0 },
             { id: 'score_100', name: 'Century', desc: 'Score 100+', condition: (s) => s >= 100 },
@@ -272,6 +273,30 @@ class Leaderboard {
                 }, 5000);
             }
         });
+    }
+
+    resolveAdminAccessCode() {
+        if (window.ADMIN_ACCESS_CODE) {
+            return window.ADMIN_ACCESS_CODE;
+        }
+        if (window.adminConfig && window.adminConfig.accessCode) {
+            return window.adminConfig.accessCode;
+        }
+        try {
+            const stored = localStorage.getItem('snowRider3D_adminAccessCode');
+            if (stored) return stored;
+        } catch (_) { /* ignore */ }
+        return null;
+    }
+
+    promptForAdminAccessCode() {
+        const entered = prompt('Enter admin access code (this is kept in your browser, not the repo):');
+        if (!entered) return null;
+        try {
+            localStorage.setItem('snowRider3D_adminAccessCode', entered);
+        } catch (_) { /* ignore */ }
+        this.adminAccessCode = entered;
+        return entered;
     }
 
     fallbackToLocalOnly() {
@@ -880,17 +905,20 @@ class Leaderboard {
 
     // Remove scores with passkey protection
     showRemoveScoresDialog() {
-        const passkey = prompt('🔐 Enter admin passkey to remove all scores:', '');
+        const accessCode = this.adminAccessCode || this.promptForAdminAccessCode();
+        if (!accessCode) {
+            alert('❌ No admin access code set.');
+            return;
+        }
+
+        const passkey = prompt('🔐 Enter admin access code to remove all scores:', '');
         
         if (passkey === null) {
             console.log('ℹ️ Remove cancelled');
             return;
         }
         
-        // Admin passkey (change this to your own secure passkey)
-        const ADMIN_PASSKEY = 'snowrider2025';
-        
-        if (passkey !== ADMIN_PASSKEY) {
+        if (passkey !== accessCode) {
             alert('❌ Incorrect passkey! Access denied.');
             console.log('⚠️ Invalid passkey attempt');
             return;
@@ -914,8 +942,14 @@ class Leaderboard {
         }
 
         // Ask for passkey
-        const passkey = prompt('Enter admin passkey to delete this score:');
-        if (passkey !== 'snowrider2025') {
+        const accessCode = this.adminAccessCode || this.promptForAdminAccessCode();
+        if (!accessCode) {
+            alert('❌ No admin access code set.');
+            return;
+        }
+
+        const passkey = prompt('Enter admin access code to delete this score:');
+        if (passkey !== accessCode) {
             alert('❌ Incorrect passkey!');
             return;
         }
