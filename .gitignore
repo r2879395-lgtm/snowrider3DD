@@ -29,5 +29,3 @@ logs/
 # Uncomment this if you want to keep Firebase config private:
 # js/firebase-config.js
 
-# Admin access code (keep secrets out of git)
-js/admin-config.js
